@@ -1,14 +1,12 @@
 "use client";
 
-"use client";
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import DashboardNavbar from "@/components/DashboardNavbar";
 
-export default function TradePage() {
+function TradeContent() {
   const searchParams = useSearchParams();
   const couponCode = searchParams.get("coupon");
   const [timeRemaining, setTimeRemaining] = useState(1200); // 20 minutes in seconds
@@ -199,5 +197,23 @@ export default function TradePage() {
       </div>
     </div>
     </>
+  );
+}
+
+export default function TradePage() {
+  return (
+    <Suspense fallback={
+      <>
+        <DashboardNavbar />
+        <div className="min-h-screen bg-grid pt-24 pb-8 px-4 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-zinc-400">Loading trade session...</p>
+          </div>
+        </div>
+      </>
+    }>
+      <TradeContent />
+    </Suspense>
   );
 }
