@@ -1,4 +1,4 @@
-const API_BASE_URL ='http://api.jinma.tech/api';
+const API_BASE_URL ='https://api.jinma.tech/api';
 
 export interface ApiResponse<T> {
   success: boolean;
