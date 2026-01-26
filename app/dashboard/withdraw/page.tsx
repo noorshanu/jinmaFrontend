@@ -216,7 +216,7 @@ export default function WithdrawPage() {
   return (
     <>
       <DashboardNavbar />
-      <div className="min-h-screen bg-grid pt-24 pb-8 px-4">
+      <div className="min-h-screen bg-grid pt-36 sm:pt-24 pb-8 px-4">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
         <motion.div

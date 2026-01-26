@@ -106,7 +106,7 @@ export default function DashboardPage() {
   return (
     <>
       <DashboardNavbar />
-      <div className="min-h-screen bg-grid pt-24 pb-8 px-4">
+      <div className="min-h-screen bg-grid pt-36 sm:pt-24 pb-8 px-4">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <motion.div
