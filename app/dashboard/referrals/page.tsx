@@ -116,7 +116,7 @@ export default function ReferralsPage() {
           {stats && (
             <div className="mb-8">
               <ReferralLink
-                referralUrl={stats.referralUrl}
+                referralCode={stats.referralCode}
                 bonusPercent={stats.bonusPercent}
               />
             </div>

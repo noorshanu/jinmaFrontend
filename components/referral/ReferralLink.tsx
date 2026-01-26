@@ -1,16 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { LuCopy, LuCheck, LuExternalLink } from "react-icons/lu";
 
 interface ReferralLinkProps {
-  referralUrl: string;
+  referralUrl?: string;
+  referralCode?: string;
   bonusPercent: number;
 }
 
-export default function ReferralLink({ referralUrl, bonusPercent }: ReferralLinkProps) {
+export default function ReferralLink({ referralUrl, referralCode, bonusPercent }: ReferralLinkProps) {
   const [copied, setCopied] = useState(false);
+
+  // Generate domain-centric referral URL
+  const generatedReferralUrl = useMemo(() => {
+    // If referralCode is provided, generate URL dynamically
+    if (referralCode) {
+      if (typeof window === 'undefined') {
+        // SSR fallback
+        return '';
+      }
+
+      const { host } = window.location;
+      
+      // Use http for localhost, https for production
+      const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
+      const urlProtocol = isLocalhost ? 'http' : 'https';
+      
+      // Build the URL
+      return `${urlProtocol}://${host}/register?ref=${referralCode}`;
+    }
+    
+    // Fallback to provided referralUrl if no referralCode
+    return referralUrl || '';
+  }, [referralCode, referralUrl]);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -33,13 +57,13 @@ export default function ReferralLink({ referralUrl, bonusPercent }: ReferralLink
         <div className="flex-1 relative">
           <input
             type="text"
-            value={referralUrl}
+            value={generatedReferralUrl}
             readOnly
             className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700/50 rounded-xl text-white font-mono text-sm focus:outline-none focus:border-blue-500/50"
           />
         </div>
         <button
-          onClick={() => copyToClipboard(referralUrl)}
+          onClick={() => copyToClipboard(generatedReferralUrl)}
           className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
         >
           {copied ? (
