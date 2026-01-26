@@ -18,7 +18,7 @@ import {
 
 const navLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LuLayoutDashboard },
-  { href: "/dashboard/coupons", label: "Coupons", icon: LuTicket },
+  { href: "/dashboard/signals", label: "Signals", icon: LuTicket },
   { href: "/dashboard/trade", label: "Trade", icon: LuTrendingUp },
   { href: "/dashboard/referrals", label: "Referrals", icon: LuUsers },
   { href: "/dashboard/grades", label: "Grades", icon: LuStar },
