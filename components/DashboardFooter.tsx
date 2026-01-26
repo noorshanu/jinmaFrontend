@@ -12,8 +12,7 @@ const DashboardFooter = () => {
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Copyright */}
           <p className="text-zinc-500 text-sm flex items-center gap-1">
-            © {currentYear} MarketProject. Made with{" "}
-            <LuHeart size={14} className="text-red-400" /> All rights reserved.
+            © {currentYear} Jinma All rights reserved.
           </p>
 
           {/* Links */}
