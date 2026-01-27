@@ -143,7 +143,7 @@ export default function LoginPage() {
               className="text-3xl md:text-4xl font-bold mb-2"
             >
               <span className="bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
-                BTC/USDT
+               JINMA BTC/USDT
               </span>
               <br />
               <span className="text-white/90">Marketplace</span>
@@ -221,7 +221,7 @@ export default function LoginPage() {
                     required
                     disabled={loading}
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-300 disabled:opacity-50"
-                    placeholder="Noor"
+                    placeholder="John"
                   />
                 </div>
                 <div>
@@ -237,7 +237,7 @@ export default function LoginPage() {
                     required
                     disabled={loading}
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-300 disabled:opacity-50"
-                    placeholder="Alam"
+                    placeholder="Doe"
                   />
                 </div>
               </motion.div>
