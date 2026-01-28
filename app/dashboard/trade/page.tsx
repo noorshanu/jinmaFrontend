@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useState, useEffect, Suspense, useMemo } from "react";
@@ -618,7 +619,7 @@ function TradeContent() {
                   <img
                     src="/chart.png"
                     alt="BTC result chart"
-                    fill
+
                     className="object-cover opacity-90"
                   />
                 </div>
