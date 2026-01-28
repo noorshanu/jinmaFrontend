@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { LuHeart } from "react-icons/lu";
 
 const DashboardFooter = () => {
   const currentYear = new Date().getFullYear();
@@ -12,7 +11,7 @@ const DashboardFooter = () => {
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Copyright */}
           <p className="text-zinc-500 text-sm flex items-center gap-1">
-            © {currentYear} Jinma All rights reserved.
+            © {currentYear} JINMA BTC/USDT Marketplace. All rights reserved.
           </p>
 
           {/* Links */}

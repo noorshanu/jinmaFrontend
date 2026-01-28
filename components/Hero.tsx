@@ -82,9 +82,9 @@ export default function Hero() {
               transition={{ duration: 0.8 }}
               className="space-y-4"
             >
-              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-6xl font-extrabold leading-[0.9] md:leading-[1.2]">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-6xl font-extrabold leading-[0.9] md:leading-[1.25]">
                 <span className="bg-gradient-to-r from-white to-zinc-300 bg-clip-text text-transparent">
-                  JINMA BTC/USDT
+                JINMA BTC/USDT
                 </span>
                 <br />
                 <span className="text-white/80">Marketplace</span>
@@ -99,7 +99,7 @@ export default function Hero() {
               >
                 <div className="absolute -left-2 top-0 w-1 h-full bg-gradient-to-b from-blue-400 to-transparent rounded-full" />
                 <p className="text-lg md:text-xl text-zinc-300 max-w-2xl pl-4">
-                  Trade JINMA BTC/USDT with confidence on our secure, fast, and user-friendly marketplace. Experience seamless crypto trading with real-time prices and instant execution.
+                  Trade BTC/USDT with confidence on our secure, fast, and user-friendly marketplace. Experience seamless crypto trading with real-time prices and instant execution.
                 </p>
               </motion.div>
             </motion.div>

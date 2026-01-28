@@ -135,7 +135,7 @@ function RegisterContent() {
               className="text-3xl md:text-4xl font-bold mb-2"
             >
               <span className="bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
-                  Join JINMA BTC/USDT
+                Join BTC/USDT
               </span>
               <br />
               <span className="text-white/90">Marketplace</span>

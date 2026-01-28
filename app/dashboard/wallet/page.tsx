@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import DashboardNavbar from "@/components/DashboardNavbar";
-import { apiClient } from "@/lib/api";
+import { apiClient, WalletResponse } from "@/lib/api";
 import {
   LuWallet,
   LuRocket,
@@ -14,24 +14,20 @@ import {
   LuArrowRight,
   LuArrowLeft,
   LuX,
-  LuRefreshCw
+  LuRefreshCw,
+  LuLock,
+  LuLockOpen
 } from "react-icons/lu";
 import DashboardFooter from "@/components/DashboardFooter";
 
-interface Wallet {
-  id: string;
-  mainBalance: number;
-  movementBalance: number;
-  totalBalance: number;
-  totalDeposited: number;
-  totalWithdrawn: number;
-  totalTransferred: number;
-}
+type Wallet = WalletResponse["wallet"];
 
 interface Transfer {
   id: string;
   direction: string;
   amount: number;
+  fee?: number;
+  netAmount?: number;
   status: string;
   createdAt: string;
 }
@@ -41,6 +37,7 @@ export default function WalletPage() {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [lockCountdown, setLockCountdown] = useState<string>("");
 
   // Transfer modal state
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -49,11 +46,7 @@ export default function WalletPage() {
   const [transferLoading, setTransferLoading] = useState(false);
   const [transferSuccess, setTransferSuccess] = useState("");
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [walletRes, transfersRes] = await Promise.all([
         apiClient.getWallet(),
@@ -71,7 +64,47 @@ export default function WalletPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Format countdown from milliseconds
+  const formatLockCountdown = useCallback((ms: number): string => {
+    if (ms <= 0) return "Unlocked";
+    
+    const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+    const hours = Math.floor((ms % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+    const minutes = Math.floor((ms % (60 * 60 * 1000)) / (60 * 1000));
+    
+    if (days > 0) {
+      return `${days} day${days > 1 ? "s" : ""} ${hours}h ${minutes}m`;
+    }
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Update countdown every minute
+  useEffect(() => {
+    if (!wallet?.transferLock?.isLocked || !wallet?.transferLock?.lockEndsAt) {
+      setLockCountdown("");
+      return;
+    }
+
+    const updateCountdown = () => {
+      const lockEndTime = new Date(wallet.transferLock.lockEndsAt!).getTime();
+      const remaining = lockEndTime - Date.now();
+      setLockCountdown(formatLockCountdown(remaining));
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, [wallet?.transferLock?.isLocked, wallet?.transferLock?.lockEndsAt, formatLockCountdown]);
 
   const handleTransfer = async () => {
     if (!transferAmount || parseFloat(transferAmount) <= 0) {
@@ -145,7 +178,7 @@ export default function WalletPage() {
   return (
     <>
       <DashboardNavbar />
-      <div className="min-h-screen bg-grid pt-36 sm:pt-24 pb-8 px-4">
+      <div className="min-h-screen bg-grid pt-24 pb-8 px-4">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <motion.div
@@ -226,6 +259,63 @@ export default function WalletPage() {
               </div>
             </motion.div>
           </div>
+
+          {/* Transfer Lock Status */}
+          {wallet?.transferLock && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+              className={`mb-8 rounded-2xl p-5 border ${
+                wallet.transferLock.isLocked
+                  ? "bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-yellow-500/20"
+                  : "bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/20"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                    wallet.transferLock.isLocked
+                      ? "bg-yellow-500/20"
+                      : "bg-green-500/20"
+                  }`}>
+                    {wallet.transferLock.isLocked ? (
+                      <LuLock size={24} className="text-yellow-400" />
+                    ) : (
+                      <LuLockOpen size={24} className="text-green-400" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className={`font-semibold ${
+                      wallet.transferLock.isLocked ? "text-yellow-400" : "text-green-400"
+                    }`}>
+                      {wallet.transferLock.isLocked
+                        ? "Transfer Lock Active"
+                        : "Transfers Unlocked"}
+                    </h3>
+                    <p className="text-zinc-400 text-sm">
+                      {wallet.transferLock.isLocked
+                        ? "Movement → Main transfers are temporarily locked"
+                        : "You can transfer from Movement to Main wallet"}
+                    </p>
+                  </div>
+                </div>
+                {wallet.transferLock.isLocked && lockCountdown && (
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-yellow-400">{lockCountdown}</p>
+                    <p className="text-yellow-500/70 text-xs">remaining</p>
+                  </div>
+                )}
+              </div>
+              {wallet.transferLock.isLocked && wallet.transferLock.lockEndsAt && (
+                <div className="mt-3 pt-3 border-t border-white/10">
+                  <p className="text-xs text-zinc-500">
+                    🔓 Unlocks on: {new Date(wallet.transferLock.lockEndsAt).toLocaleString()}
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          )}
 
           {/* Stats Row */}
           <div className="grid grid-cols-3 gap-4 mb-8">
@@ -399,21 +489,52 @@ export default function WalletPage() {
                     </button>
                     <button
                       onClick={() => setTransferDirection("movement_to_main")}
+                      disabled={wallet?.transferLock?.isLocked}
                       className={`p-4 rounded-xl text-sm font-medium transition-all ${
-                        transferDirection === "movement_to_main"
+                        wallet?.transferLock?.isLocked
+                          ? "bg-zinc-800/50 border-2 border-zinc-700 text-zinc-600 cursor-not-allowed"
+                          : transferDirection === "movement_to_main"
                           ? "bg-blue-500/20 border-2 border-blue-500 text-blue-400"
                           : "bg-white/5 border-2 border-transparent text-zinc-400 hover:bg-white/10"
                       }`}
                     >
                       <div className="flex items-center justify-center gap-2 mb-1">
-                        <LuRocket size={18} />
-                        <LuArrowRight size={14} />
-                        <LuWallet size={18} />
+                        {wallet?.transferLock?.isLocked ? (
+                          <LuLock size={18} />
+                        ) : (
+                          <>
+                            <LuRocket size={18} />
+                            <LuArrowRight size={14} />
+                            <LuWallet size={18} />
+                          </>
+                        )}
                       </div>
-                      Movement → Main
+                      {wallet?.transferLock?.isLocked ? "Locked" : "Movement → Main"}
                     </button>
                   </div>
                 </div>
+
+                {/* Lock Warning in Modal */}
+                {wallet?.transferLock?.isLocked && (
+                  <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+                    <div className="flex items-center gap-2 text-yellow-400 text-sm font-medium mb-1">
+                      <LuLock size={14} />
+                      <span>Transfer Lock: {lockCountdown} remaining</span>
+                    </div>
+                    <p className="text-yellow-500/70 text-xs">
+                      Movement → Main transfers are locked until {wallet.transferLock.lockEndsAt && new Date(wallet.transferLock.lockEndsAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                )}
+
+                {/* Lock Warning for Main → Movement */}
+                {transferDirection === "main_to_movement" && (
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                    <p className="text-blue-400 text-xs">
+                      ⚠️ This transfer will {wallet?.transferLock?.isLocked ? "reset" : "activate"} a {wallet?.transferLock?.lockDurationDays || 15}-day lock on Movement → Main transfers.
+                    </p>
+                  </div>
+                )}
 
                 {/* Available Balance */}
                 <div className="p-4 bg-white/5 rounded-xl">
@@ -447,7 +568,12 @@ export default function WalletPage() {
                 {/* Submit */}
                 <button
                   onClick={handleTransfer}
-                  disabled={transferLoading || !transferAmount || parseFloat(transferAmount) > getMaxAmount()}
+                  disabled={
+                    transferLoading || 
+                    !transferAmount || 
+                    parseFloat(transferAmount) > getMaxAmount() ||
+                    (transferDirection === "movement_to_main" && wallet?.transferLock?.isLocked)
+                  }
                   className="w-full py-4 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl font-semibold text-white transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 >
                   {transferLoading ? "Processing..." : "Transfer"}

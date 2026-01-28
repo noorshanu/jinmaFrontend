@@ -7,9 +7,7 @@ import { apiClient } from "@/lib/api";
 
 const links = [
   { id: "Home", label: "Home" },
-  { id: "About", label: "About" },
-  { id: "Marketplace", label: "Marketplace" },
-  { id: "Contact", label: "Contact" },
+
 ];
 
 export default function Navbar() {

@@ -33,6 +33,22 @@ export interface WalletResponse {
     totalWithdrawn: number;
     totalTransferred: number;
     createdAt: string;
+    // Transfer lock info
+    transferLock: {
+      isLocked: boolean;
+      lockEndsAt: string | null;
+      lockRemainingMs: number;
+      lockDurationDays: number;
+      lastMainToMovementTransfer: string | null;
+    };
+    // Transfer fee info
+    transferFee: {
+      feePercent: number;
+      flatFee: number;
+      minAmount: number;
+      isEnabled: boolean;
+      message: string;
+    };
   };
 }
 
@@ -40,12 +56,16 @@ export interface TransferResponse {
   id: string;
   direction: string;
   amount: number;
+  fee: number;
+  netAmount: number;
   status: string;
   createdAt: string;
   newBalances: {
     mainBalance: number;
     movementBalance: number;
   };
+  lockTriggered?: boolean;
+  lockDurationDays?: number;
 }
 
 export interface TransferHistoryResponse {
@@ -77,7 +97,9 @@ export interface DepositResponse {
     depositType: string;
     token: string;
     requestedAmount: number;
+    approvedAmount?: number | null;
     status: string;
+    transactionHash?: string | null;
     createdAt: string;
   };
 }
@@ -154,6 +176,128 @@ export interface WithdrawalHistoryResponse {
     total: number;
     pages: number;
   };
+}
+
+// Signal types
+export interface Signal {
+  id: string;
+  type: 'DAILY' | 'REFERRAL';
+  timeSlot: 'MORNING' | 'EVENING' | 'REFERRAL';
+  title: string;
+  description?: string;
+  commitPercent: number;
+  createdAt: string;
+  expiresAt: string;
+  timeRemaining: number; // seconds
+}
+
+export interface SignalLimits {
+  dailySignalsUsed: number;
+  dailySignalsRemaining: number;
+  referralSignalsUsed: number;
+  referralSignalsRemaining: number;
+  maxDailySignals: number;
+  maxReferralSignals: number;
+}
+
+export interface AvailableSignalsResponse {
+  signals: Signal[];
+  limits: SignalLimits;
+}
+
+export interface SignalHistoryItem {
+  id: string;
+  signal: {
+    id: string;
+    title: string;
+    type: 'DAILY' | 'REFERRAL';
+    timeSlot: 'MORNING' | 'EVENING' | 'REFERRAL';
+  } | null;
+  committedAmount: number;
+  outcome: 'PENDING' | 'PROFIT' | 'LOSS' | 'CANCELLED';
+  resultAmount: number;
+  confirmedAt: string;
+  settledAt: string | null;
+  movementBalanceBefore: number;
+  movementBalanceAfter: number;
+}
+
+export interface SignalHistoryResponse {
+  history: SignalHistoryItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+export interface ConfirmSignalResponse {
+  id: string;
+  signal: {
+    id: string;
+    title: string;
+    type: string;
+    expiresAt: string;
+  };
+  committedAmount: number;
+  outcome: string;
+  confirmedAt: string;
+  settlesAt: string;
+  movementBalanceBefore: number;
+  lockedBalance: number;
+  availableBalance: number;
+}
+
+// Grade types
+export interface GradeInfo {
+  name: string;
+  level: number;
+  minTurnover: number;
+  salary: number;
+  isCurrent: boolean;
+  isEligible: boolean;
+  isUnlocked: boolean;
+}
+
+export interface GradeStatusResponse {
+  currentGrade: string;
+  currentSalary: number;
+  personalTurnover: number;
+  eligibleGrade: string;
+  eligibleSalary: number;
+  canUpgrade: boolean;
+  hasPendingRequest: boolean;
+  pendingRequestGrade: string | null;
+  nextGrade: string | null;
+  nextGradeMinTurnover: number | null;
+  nextGradeSalary: number | null;
+  salaryStartDate: string | null;
+  grades: GradeInfo[];
+}
+
+export interface GradeRequest {
+  id: string;
+  requestedGrade: string;
+  currentGrade: string;
+  personalTurnover: number;
+  requiredTurnover: number;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  adminNote: string | null;
+  processedBy: { id: string; name: string } | null;
+  processedAt: string | null;
+  requestedAt: string;
+}
+
+export interface SalaryPayment {
+  id: string;
+  grade: string;
+  amount: number;
+  month: number;
+  year: number;
+  status: 'PENDING' | 'PAID' | 'SKIPPED';
+  paidAt: string | null;
+  note: string | null;
 }
 
 class ApiClient {
@@ -281,14 +425,12 @@ class ApiClient {
   }
 
   async createWalletConnectDeposit(
-    token: string,
-    amount: number,
     transactionHash: string,
     senderAddress: string
   ): Promise<ApiResponse<DepositResponse>> {
     return this.request<DepositResponse>('/wallet/deposit/walletconnect', {
       method: 'POST',
-      body: JSON.stringify({ token, amount, transactionHash, senderAddress }),
+      body: JSON.stringify({ transactionHash, senderAddress }),
     });
   }
 
@@ -369,6 +511,40 @@ class ApiClient {
     }>;
   }>> {
     return this.request('/referral/downline');
+  }
+
+  // Signal endpoints
+  async getAvailableSignals(): Promise<ApiResponse<AvailableSignalsResponse>> {
+    return this.request<AvailableSignalsResponse>('/signals/available');
+  }
+
+  async getSignalHistory(page = 1, limit = 20): Promise<ApiResponse<SignalHistoryResponse>> {
+    return this.request<SignalHistoryResponse>(`/signals/history?page=${page}&limit=${limit}`);
+  }
+
+  async confirmSignal(signalId: string): Promise<ApiResponse<ConfirmSignalResponse>> {
+    return this.request<ConfirmSignalResponse>(`/signals/${signalId}/confirm`, {
+      method: 'POST',
+    });
+  }
+
+  // Grade endpoints
+  async getGradeStatus(): Promise<ApiResponse<GradeStatusResponse>> {
+    return this.request<GradeStatusResponse>('/grades/status');
+  }
+
+  async requestGradeUpgrade(): Promise<ApiResponse<{ request: GradeRequest }>> {
+    return this.request<{ request: GradeRequest }>('/grades/request-upgrade', {
+      method: 'POST',
+    });
+  }
+
+  async getGradeRequestHistory(): Promise<ApiResponse<{ requests: GradeRequest[] }>> {
+    return this.request<{ requests: GradeRequest[] }>('/grades/requests');
+  }
+
+  async getSalaryHistory(): Promise<ApiResponse<{ payments: SalaryPayment[] }>> {
+    return this.request<{ payments: SalaryPayment[] }>('/grades/salary-history');
   }
 }
 

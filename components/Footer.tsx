@@ -59,13 +59,10 @@ const Footer = () => {
             className="lg:col-span-2"
           >
             <Link href="/" className="flex items-center gap-2 group mb-4">
-              <div className="h-6 w-6 rotate-180 bg-gradient-to-b from-zinc-200 to-zinc-500 clip-tri transition-transform duration-300 group-hover:rotate-0" />
-              <span className="text-sm tracking-[0.35em] text-zinc-400 font-medium">
-Jinma Marketplace
-              </span>
+          <img src="/logo.png" alt="JINMA" className="h-16 w-56" />
             </Link>
             <p className="text-zinc-400 text-sm leading-relaxed mb-6 max-w-md">
-              Your trusted platform for Jinma trading. Experience seamless transactions, 
+              Your trusted platform for BTC/USDT trading. Experience seamless transactions, 
               secure trading, and powerful tools to maximize your crypto potential.
             </p>
             
@@ -233,7 +230,7 @@ Jinma Marketplace
           className="mt-8 pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4"
         >
           <p className="text-zinc-500 text-sm text-center md:text-left">
-            © {currentYear} Jinma  All rights reserved.
+            © {currentYear} JINMA BTC/USDT Marketplace. All rights reserved.
           </p>
           <div className="flex items-center gap-6 text-sm">
             <Link

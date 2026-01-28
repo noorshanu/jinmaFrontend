@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import DashboardNavbar from "@/components/DashboardNavbar";
-import { apiClient } from "@/lib/api";
+import { apiClient, WalletResponse } from "@/lib/api";
 import { 
   LuWallet, 
   LuRocket, 
@@ -15,16 +15,12 @@ import {
   LuCircleDollarSign,
   LuClock,
   LuBan,
-  LuInbox
+  LuInbox,
+  LuLock
 } from "react-icons/lu";
 import DashboardFooter from "@/components/DashboardFooter";
 
-interface Wallet {
-  mainBalance: number;
-  movementBalance: number;
-  totalBalance: number;
-  totalDeposited: number;
-}
+type Wallet = WalletResponse["wallet"];
 
 interface Activity {
   id: string;
@@ -38,6 +34,20 @@ export default function DashboardPage() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [loading, setLoading] = useState(true);
   const [recentActivity, setRecentActivity] = useState<Activity[]>([]);
+  const [lockCountdown, setLockCountdown] = useState<string>("");
+
+  // Format countdown from milliseconds
+  const formatLockCountdown = useCallback((ms: number): string => {
+    if (ms <= 0) return "";
+    
+    const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+    const hours = Math.floor((ms % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+    
+    if (days > 0) {
+      return `${days} day${days > 1 ? "s" : ""} ${hours > 0 ? hours + "h" : ""}`;
+    }
+    return `${hours}h`;
+  }, []);
 
   useEffect(() => {
     const loadData = async () => {
@@ -69,6 +79,25 @@ export default function DashboardPage() {
     
     loadData();
   }, []);
+
+  // Update lock countdown
+  useEffect(() => {
+    if (!wallet?.transferLock?.isLocked || !wallet?.transferLock?.lockEndsAt) {
+      setLockCountdown("");
+      return;
+    }
+
+    const updateCountdown = () => {
+      const lockEndTime = new Date(wallet.transferLock.lockEndsAt!).getTime();
+      const remaining = lockEndTime - Date.now();
+      setLockCountdown(formatLockCountdown(remaining));
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 60000);
+
+    return () => clearInterval(interval);
+  }, [wallet?.transferLock?.isLocked, wallet?.transferLock?.lockEndsAt, formatLockCountdown]);
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
@@ -106,7 +135,7 @@ export default function DashboardPage() {
   return (
     <>
       <DashboardNavbar />
-      <div className="min-h-screen bg-grid pt-36 sm:pt-24 pb-8 px-4">
+      <div className="min-h-screen bg-grid pt-24 pb-8 px-4">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <motion.div
@@ -197,6 +226,32 @@ export default function DashboardPage() {
             </motion.div>
           </div>
 
+          {/* Transfer Lock Status Banner */}
+          {wallet?.transferLock?.isLocked && lockCountdown && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.22 }}
+              className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 backdrop-blur-xl border border-yellow-500/20 rounded-2xl p-4 mb-8"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                    <LuLock size={20} className="text-yellow-400" />
+                  </div>
+                  <div>
+                    <p className="text-yellow-400 font-medium text-sm">Transfer Lock Active</p>
+                    <p className="text-yellow-500/70 text-xs">Movement → Main transfers are locked</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-bold text-yellow-400">{lockCountdown}</p>
+                  <p className="text-yellow-500/70 text-xs">remaining</p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Total Balance Banner */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -225,11 +280,11 @@ export default function DashboardPage() {
             <h2 className="text-xl font-semibold text-white mb-4">Quick Actions</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Link
-                href="/dashboard/signals"
+                href="/dashboard/coupons"
                 className="flex flex-col items-center justify-center p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-all duration-300 hover:scale-105"
               >
                 <LuTicket size={28} className="text-amber-400 mb-2" />
-                <span className="text-sm text-zinc-300 font-medium">Signals</span>
+                <span className="text-sm text-zinc-300 font-medium">Coupons</span>
               </Link>
               <Link
                 href="/dashboard/trade"
