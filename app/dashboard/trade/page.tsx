@@ -619,7 +619,6 @@ function TradeContent() {
                   <img
                     src="/chart.png"
                     alt="BTC result chart"
-
                     className="object-cover opacity-90"
                   />
                 </div>
