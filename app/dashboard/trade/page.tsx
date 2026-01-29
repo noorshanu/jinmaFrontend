@@ -3,11 +3,10 @@
 
 import { useState, useEffect, Suspense, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import DashboardNavbar from "@/components/DashboardNavbar";
-import { apiClient, WalletResponse } from "@/lib/api";
+import { apiClient, WalletResponse, UserProfileResponse } from "@/lib/api";
 
 type TradeResult = "PENDING" | "WIN" | "LOSS";
 
@@ -22,6 +21,10 @@ function TradeContent() {
   const [walletError, setWalletError] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showResultModal, setShowResultModal] = useState(false);
+  
+  // Trading status
+  const [userProfile, setUserProfile] = useState<UserProfileResponse | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
 
   // For now, use a fixed coupon percentage; later this can come from backend
   const couponPercentage = 10;
@@ -32,15 +35,25 @@ function TradeContent() {
     [movementBalance, couponPercentage]
   );
 
-  // Fetch real wallet (movement balance)
+  // Fetch real wallet (movement balance) and user profile
   useEffect(() => {
-    const fetchWallet = async () => {
+    const fetchData = async () => {
       try {
         setLoadingWallet(true);
+        setLoadingProfile(true);
         setWalletError(null);
-        const res = await apiClient.getWallet();
-        if (res.success && res.data) {
-          setWallet(res.data.wallet);
+        
+        const [walletRes, profileRes] = await Promise.all([
+          apiClient.getWallet(),
+          apiClient.getUserProfile(),
+        ]);
+        
+        if (walletRes.success && walletRes.data) {
+          setWallet(walletRes.data.wallet);
+        }
+        
+        if (profileRes.success && profileRes.data) {
+          setUserProfile(profileRes.data);
         }
       } catch (err: unknown) {
         setWalletError(
@@ -48,9 +61,10 @@ function TradeContent() {
         );
       } finally {
         setLoadingWallet(false);
+        setLoadingProfile(false);
       }
     };
-    void fetchWallet();
+    void fetchData();
   }, []);
 
   // Load TradingView BTC chart
@@ -156,6 +170,33 @@ function TradeContent() {
     setShowResultModal(false);
   };
 
+  // Trading restrictions
+  const isTradingActive = userProfile?.isTradingActive ?? false;
+  const hasMinBalance = movementBalance >= 250;
+  const canTrade = hasMinBalance && isTradingActive;
+  const isCheckingStatus = loadingWallet || loadingProfile;
+  
+  // Restriction messages
+  const getTradingRestrictionMessage = () => {
+    if (!hasMinBalance) {
+      return {
+        type: "balance" as const,
+        title: "Insufficient Balance",
+        message: "Your Movement Wallet balance is below $250. Please add balance to start trading.",
+      };
+    }
+    if (!isTradingActive) {
+      return {
+        type: "inactive" as const,
+        title: "Trading Deactivated",
+        message: "Your trading account is deactivated. Please contact admin to reactivate your trading status.",
+      };
+    }
+    return null;
+  };
+  
+  const restriction = getTradingRestrictionMessage();
+
   return (
     <>
       <DashboardNavbar />
@@ -197,6 +238,49 @@ function TradeContent() {
           </div>
         </motion.div>
 
+        {/* Trading Restriction Warning */}
+        {!isCheckingStatus && restriction && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`mb-6 p-5 rounded-xl border ${
+              restriction.type === "balance"
+                ? "bg-yellow-500/10 border-yellow-500/30"
+                : "bg-orange-500/10 border-orange-500/30"
+            }`}
+          >
+            <div className="flex items-start gap-4">
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+                restriction.type === "balance"
+                  ? "bg-yellow-500/20"
+                  : "bg-orange-500/20"
+              }`}>
+                <span className="text-2xl">{restriction.type === "balance" ? "💰" : "⚠️"}</span>
+              </div>
+              <div className="flex-1">
+                <h3 className={`text-lg font-semibold mb-2 ${
+                  restriction.type === "balance" ? "text-yellow-300" : "text-orange-300"
+                }`}>
+                  {restriction.title}
+                </h3>
+                <p className={`text-sm ${
+                  restriction.type === "balance" ? "text-yellow-400/80" : "text-orange-400/80"
+                }`}>
+                  {restriction.message}
+                </p>
+                {restriction.type === "balance" && (
+                  <Link
+                    href="/dashboard/transfer"
+                    className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/20 text-yellow-300 rounded-lg text-sm font-medium hover:bg-yellow-500/30 transition-colors"
+                  >
+                    Add Balance →
+                  </Link>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {!isConfirmed ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -207,20 +291,32 @@ function TradeContent() {
           <div className="mb-6">
             <p className="text-sm text-zinc-400 mb-2">Available Coupon</p>
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-4">
-                <p className="text-xs uppercase tracking-wide text-blue-300 mb-1">
+              <div className={`rounded-xl border p-4 ${
+                canTrade 
+                  ? "border-blue-500/30 bg-blue-500/10" 
+                  : "border-zinc-500/30 bg-zinc-500/10 opacity-60"
+              }`}>
+                <p className={`text-xs uppercase tracking-wide mb-1 ${
+                  canTrade ? "text-blue-300" : "text-zinc-400"
+                }`}>
                   Coupon
                 </p>
                 <p className="text-lg font-semibold text-white mb-1">{couponCode}</p>
-                <p className="text-sm text-blue-200 mb-3">
+                <p className={`text-sm mb-3 ${canTrade ? "text-blue-200" : "text-zinc-400"}`}>
                   Uses <span className="font-semibold">{couponPercentage}%</span> of your Movement
                   Account balance.
                 </p>
                 <button
                   onClick={handleUseCoupon}
-                  className="inline-flex items-center justify-center rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-400 transition-colors"
+                  disabled={!canTrade || isCheckingStatus}
+                  className={`inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                    canTrade && !isCheckingStatus
+                      ? "bg-blue-500 text-white hover:bg-blue-400"
+                      : "bg-zinc-600 text-zinc-400 cursor-not-allowed"
+                  }`}
+                  title={!canTrade ? restriction?.message : undefined}
                 >
-                  Use Coupon
+                  {isCheckingStatus ? "Checking..." : "Use Coupon"}
                 </button>
               </div>
             </div>
@@ -297,9 +393,15 @@ function TradeContent() {
               {/* Confirm Button */}
               <button
                 onClick={handleUseCoupon}
-                className="w-full btn-primary rounded-xl px-6 py-4 font-semibold text-center transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-blue-500/25"
+                disabled={!canTrade || isCheckingStatus}
+                className={`w-full rounded-xl px-6 py-4 font-semibold text-center transition-all duration-300 ${
+                  canTrade && !isCheckingStatus
+                    ? "btn-primary hover:scale-105 hover:shadow-lg hover:shadow-blue-500/25"
+                    : "bg-zinc-600 text-zinc-400 cursor-not-allowed"
+                }`}
+                title={!canTrade ? restriction?.message : undefined}
               >
-                Confirm Trade
+                {isCheckingStatus ? "Checking Status..." : "Confirm Trade"}
               </button>
             </div>
           </motion.div>
@@ -483,7 +585,12 @@ function TradeContent() {
               <button
                 type="button"
                 onClick={handleConfirmTrade}
-                className="w-1/2 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-400 transition-colors shadow-lg shadow-blue-500/30"
+                disabled={!canTrade}
+                className={`w-1/2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
+                  canTrade
+                    ? "bg-blue-500 text-white hover:bg-blue-400 shadow-lg shadow-blue-500/30"
+                    : "bg-zinc-600 text-zinc-400 cursor-not-allowed"
+                }`}
               >
                 Confirm &amp; Start
               </button>
@@ -578,13 +685,13 @@ function TradeContent() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 mt-2">
-                  {/* <button
+                  <button
                     type="button"
                     onClick={handleCloseResultModal}
                     className="flex-1 rounded-xl bg-zinc-900/80 px-4 py-2.5 text-sm font-medium text-zinc-100 hover:bg-zinc-800 transition-colors border border-zinc-700/70"
                   >
                     Back to Trade
-                  </button> */}
+                  </button>
                   <Link
                     href="/dashboard"
                     className="flex-1 inline-flex items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-black hover:bg-emerald-400 transition-colors shadow-lg shadow-emerald-500/40"
@@ -619,6 +726,7 @@ function TradeContent() {
                   <img
                     src="/chart.png"
                     alt="BTC result chart"
+                 
                     className="object-cover opacity-90"
                   />
                 </div>

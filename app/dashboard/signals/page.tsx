@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import DashboardNavbar from "@/components/DashboardNavbar";
 import DashboardFooter from "@/components/DashboardFooter";
-import { apiClient, Signal, SignalLimits, SignalHistoryItem } from "@/lib/api";
+import { apiClient, Signal, SignalLimits, SignalHistoryItem, UserProfileResponse, WalletResponse } from "@/lib/api";
 import { LuRefreshCw, LuClock, LuTrendingUp, LuTrendingDown } from "react-icons/lu";
 
 export default function SignalsPage() {
@@ -17,6 +17,33 @@ export default function SignalsPage() {
   const [history, setHistory] = useState<SignalHistoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  
+  // Trading status
+  const [userProfile, setUserProfile] = useState<UserProfileResponse | null>(null);
+  const [wallet, setWallet] = useState<WalletResponse["wallet"] | null>(null);
+  const [loadingTradingStatus, setLoadingTradingStatus] = useState(true);
+
+  const fetchTradingStatus = useCallback(async () => {
+    try {
+      setLoadingTradingStatus(true);
+      const [profileRes, walletRes] = await Promise.all([
+        apiClient.getUserProfile(),
+        apiClient.getWallet(),
+      ]);
+      
+      if (profileRes.success && profileRes.data) {
+        setUserProfile(profileRes.data);
+      }
+      
+      if (walletRes.success && walletRes.data) {
+        setWallet(walletRes.data.wallet);
+      }
+    } catch (err: unknown) {
+      console.error("Failed to fetch trading status:", err);
+    } finally {
+      setLoadingTradingStatus(false);
+    }
+  }, []);
 
   const fetchSignals = useCallback(async () => {
     try {
@@ -44,11 +71,12 @@ export default function SignalsPage() {
   }, []);
 
   useEffect(() => {
+    fetchTradingStatus();
     fetchSignals();
     // Refresh every 30 seconds to update time remaining
     const interval = setInterval(fetchSignals, 30000);
     return () => clearInterval(interval);
-  }, [fetchSignals]);
+  }, [fetchTradingStatus, fetchSignals]);
 
   const handleConfirmSignal = async (signalId: string) => {
     try {
@@ -89,6 +117,31 @@ export default function SignalsPage() {
   // Filter history
   const pendingHistory = history.filter((h) => h.outcome === "PENDING");
   const settledHistory = history.filter((h) => h.outcome !== "PENDING");
+
+  // Trading restrictions
+  const movementBalance = wallet?.movementBalance ?? 0;
+  const isTradingActive = userProfile?.isTradingActive ?? false;
+  const hasMinBalance = movementBalance >= 250;
+  const canTrade = hasMinBalance && isTradingActive;
+  
+  // Restriction messages
+  const getTradingRestrictionMessage = () => {
+    if (!hasMinBalance) {
+      return {
+        type: "balance" as const,
+        message: "Your Movement Wallet balance is below $250. Please add balance to start trading.",
+      };
+    }
+    if (!isTradingActive) {
+      return {
+        type: "inactive" as const,
+        message: "Your trading account is deactivated. Please contact admin to reactivate your trading status.",
+      };
+    }
+    return null;
+  };
+  
+  const restriction = getTradingRestrictionMessage();
 
   // Loading state
   if (loading && signals.length === 0 && !error) {
@@ -227,6 +280,49 @@ export default function SignalsPage() {
             )}
           </AnimatePresence>
 
+          {/* Trading Restriction Warning */}
+          {!loadingTradingStatus && restriction && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`mb-6 p-5 rounded-xl border ${
+                restriction.type === "balance"
+                  ? "bg-yellow-500/10 border-yellow-500/30"
+                  : "bg-orange-500/10 border-orange-500/30"
+              }`}
+            >
+              <div className="flex items-start gap-4">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  restriction.type === "balance"
+                    ? "bg-yellow-500/20"
+                    : "bg-orange-500/20"
+                }`}>
+                  <span className="text-2xl">{restriction.type === "balance" ? "💰" : "⚠️"}</span>
+                </div>
+                <div className="flex-1">
+                  <h3 className={`text-lg font-semibold mb-2 ${
+                    restriction.type === "balance" ? "text-yellow-300" : "text-orange-300"
+                  }`}>
+                    {restriction.type === "balance" ? "Insufficient Balance" : "Trading Deactivated"}
+                  </h3>
+                  <p className={`text-sm ${
+                    restriction.type === "balance" ? "text-yellow-400/80" : "text-orange-400/80"
+                  }`}>
+                    {restriction.message}
+                  </p>
+                  {restriction.type === "balance" && (
+                    <Link
+                      href="/dashboard/transfer"
+                      className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/20 text-yellow-300 rounded-lg text-sm font-medium hover:bg-yellow-500/30 transition-colors"
+                    >
+                      Add Balance →
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Usage Limits */}
           {limits && (
             <motion.div
@@ -328,8 +424,9 @@ export default function SignalsPage() {
                         </div>
                         <button
                           onClick={() => handleConfirmSignal(signal.id)}
-                          disabled={confirming === signal.id || (limits !== null && limits.dailySignalsRemaining === 0)}
-                          className="btn-primary rounded-lg px-4 py-2 text-sm font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                          disabled={!canTrade || confirming === signal.id || (limits !== null && limits.dailySignalsRemaining === 0)}
+                          className="btn-primary rounded-lg px-4 py-2 text-sm font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
+                          title={!canTrade ? restriction?.message : undefined}
                         >
                           {confirming === signal.id ? (
                             <LuRefreshCw className="w-5 h-5 animate-spin" />
@@ -406,8 +503,9 @@ export default function SignalsPage() {
                         </div>
                         <button
                           onClick={() => handleConfirmSignal(signal.id)}
-                          disabled={confirming === signal.id || (limits !== null && limits.referralSignalsRemaining === 0)}
-                          className="btn-primary rounded-lg px-4 py-2 text-sm font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                          disabled={!canTrade || confirming === signal.id || (limits !== null && limits.referralSignalsRemaining === 0)}
+                          className="btn-primary rounded-lg px-4 py-2 text-sm font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
+                          title={!canTrade ? restriction?.message : undefined}
                         >
                           {confirming === signal.id ? (
                             <LuRefreshCw className="w-5 h-5 animate-spin" />

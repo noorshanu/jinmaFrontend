@@ -7,23 +7,23 @@ import { apiClient } from "@/lib/api";
 import {
   LuCopy,
   LuTriangleAlert,
-  LuCamera,
+  LuUpload,
   LuX,
   LuCircleCheck,
-  LuCircleDollarSign
+  LuClock,
+  LuShieldCheck,
+  LuSend,
 } from "react-icons/lu";
-import Image from "next/image";
 
 type Network = "BEP20" | "TRC20";
 
-// Platform wallet addresses
 const WALLET_ADDRESSES = {
   BEP20: "0x1156B06A4387cD653af745D5Cf6082c613348Ff0",
   TRC20: "TFQ36CEmXtbcmw4SR2AA959DhCa6UscMxh",
 };
 
 interface ManualDepositProps {
-  platformAddress: string; // kept for backward compatibility
+  platformAddress: string;
   onSuccess: (message: string) => void;
   onError: (message: string) => void;
 }
@@ -38,6 +38,7 @@ export default function ManualDeposit({
   const [screenshot, setScreenshot] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentAddress = WALLET_ADDRESSES[selectedNetwork];
@@ -84,7 +85,7 @@ export default function ManualDeposit({
 
       const res = await apiClient.createManualDeposit(formData);
       if (res.success) {
-        onSuccess("Deposit request submitted! Awaiting admin approval.");
+        onSuccess("Deposit submitted! Awaiting approval.");
         setAmount("");
         setTransactionUrl("");
         setScreenshot(null);
@@ -100,7 +101,9 @@ export default function ManualDeposit({
 
   const copyAddress = () => {
     navigator.clipboard.writeText(currentAddress);
-    onSuccess("Address copied to clipboard!");
+    setCopied(true);
+    onSuccess("Address copied!");
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const clearScreenshot = (e: React.MouseEvent) => {
@@ -112,195 +115,172 @@ export default function ManualDeposit({
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
-      className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-gradient-to-br from-zinc-900/80 to-black/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"
     >
-      {/* Step 1: Select Network */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-sm">
-            1
-          </span>
-          Select Network
-        </h3>
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={() => setSelectedNetwork("BEP20")}
-            className={`p-4 rounded-xl font-medium transition-all duration-300 flex flex-col items-center gap-2 ${
-              selectedNetwork === "BEP20"
-                ? "bg-yellow-500/20 border-2 border-yellow-500 text-yellow-400"
-                : "bg-white/5 border-2 border-transparent text-zinc-400 hover:bg-white/10"
-            }`}
-          >
-            <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center overflow-hidden">
+      {/* Header - Network Selection */}
+      <div className="p-4 border-b border-white/5">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-zinc-500 uppercase tracking-wider">Network</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedNetwork("BEP20")}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                selectedNetwork === "BEP20"
+                  ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50"
+                  : "bg-white/5 text-zinc-400 border border-transparent hover:bg-white/10"
+              }`}
+            >
               <img
-                src="/bnb.png"
+                src="https://cryptologos.cc/logos/bnb-bnb-logo.png?v=040"
                 alt="BNB"
-                width={28}
-                height={28}
-                className="object-contain"
+                width={16}
+                height={16}
               />
-            </div>
-            <span>BEP20 (BSC)</span>
-            {selectedNetwork === "BEP20" && (
-              <span className="text-xs text-green-400 flex items-center gap-1">
-                <LuCircleCheck size={12} /> Selected
-              </span>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedNetwork("TRC20")}
-            className={`p-4 rounded-xl font-medium transition-all duration-300 flex flex-col items-center gap-2 ${
-              selectedNetwork === "TRC20"
-                ? "bg-red-500/20 border-2 border-red-500 text-red-400"
-                : "bg-white/5 border-2 border-transparent text-zinc-400 hover:bg-white/10"
-            }`}
-          >
-            <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center overflow-hidden">
+              BSC
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedNetwork("TRC20")}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                selectedNetwork === "TRC20"
+                  ? "bg-red-500/20 text-red-400 border border-red-500/50"
+                  : "bg-white/5 text-zinc-400 border border-transparent hover:bg-white/10"
+              }`}
+            >
               <img
-                src="/tron.png"
-                alt="Tron"
-                width={28}
-                height={28}
-                className="object-contain"
+                src="https://cryptologos.cc/logos/tron-trx-logo.png?v=040"
+                alt="TRON"
+                width={16}
+                height={16}
               />
-            </div>
-            <span>TRC20 (Tron)</span>
-            {selectedNetwork === "TRC20" && (
-              <span className="text-xs text-green-400 flex items-center gap-1">
-                <LuCircleCheck size={12} /> Selected
-              </span>
-            )}
-          </button>
+              TRON
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Step 2: Copy Address */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-sm">
-            2
-          </span>
-          Send USDT to this address ({selectedNetwork})
-        </h3>
-        <div className="bg-black/30 border border-white/10 rounded-xl p-4">
-          <div className="flex items-center justify-between gap-4">
-            <code className="text-sm text-zinc-300 break-all font-mono">
+      {/* Main Content */}
+      <div className="p-4 space-y-4">
+        {/* Deposit Address */}
+        <div className="p-3 bg-black/40 rounded-xl border border-white/5">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <p className="text-[10px] uppercase tracking-wider text-zinc-500">
+              Send USDT ({selectedNetwork}) to
+            </p>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+              selectedNetwork === "BEP20" 
+                ? "bg-yellow-500/20 text-yellow-400" 
+                : "bg-red-500/20 text-red-400"
+            }`}>
+              {selectedNetwork}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 text-xs text-zinc-300 font-mono truncate">
               {currentAddress}
             </code>
             <button
+              type="button"
               onClick={copyAddress}
-              className="shrink-0 px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors flex items-center gap-2"
+              className={`shrink-0 p-2 rounded-lg transition-all ${
+                copied 
+                  ? "bg-green-500/20 text-green-400" 
+                  : "bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white"
+              }`}
             >
-              <LuCopy size={16} />
-              Copy
+              {copied ? <LuCircleCheck size={16} /> : <LuCopy size={16} />}
             </button>
           </div>
-          <p className="text-xs text-zinc-500 mt-3 flex items-start gap-2">
-            <LuTriangleAlert size={14} className="shrink-0 mt-0.5 text-yellow-500" />
-            <span>
-              Only send <strong>USDT</strong> on{" "}
-              <strong>{selectedNetwork}</strong> network. Sending other tokens or using wrong network may result
-              in permanent loss.
-            </span>
+        </div>
+
+        {/* Warning */}
+        <div className="flex items-start gap-2 p-2 bg-yellow-500/5 rounded-lg border border-yellow-500/10">
+          <LuTriangleAlert size={14} className="text-yellow-500 shrink-0 mt-0.5" />
+          <p className="text-[11px] text-yellow-500/80">
+            Only send <strong>USDT</strong> on <strong>{selectedNetwork}</strong>. Wrong network = permanent loss.
           </p>
         </div>
-      </div>
 
-      {/* Step 3: Fill Form */}
-      <form onSubmit={handleSubmit}>
-        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-sm">
-            3
-          </span>
-          Submit deposit details
-        </h3>
-
-        <div className="space-y-4">
-          {/* Token Display (fixed to USDT) */}
-          <div>
-            <label className="block text-sm text-zinc-400 mb-2">
-              Token
-            </label>
-            <div className="px-4 py-3 bg-green-500/10 border border-green-500/30 rounded-xl text-green-400 font-medium flex items-center gap-2">
-              <LuCircleDollarSign size={20} />
-              <span>USDT</span>
-              <span className="text-xs text-zinc-500 ml-auto">({selectedNetwork})</span>
-            </div>
-          </div>
-
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-3">
           {/* Amount */}
           <div>
-            <label className="block text-sm text-zinc-400 mb-2">
-              Amount (USDT)
+            <label className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5 block">
+              Amount
             </label>
-            <input
-              type="number"
-              step="0.01"
-              min="1"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Enter amount"
-              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-300"
-            />
+            <div className="relative">
+              <input
+                type="number"
+                step="0.01"
+                min="1"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full h-11 rounded-xl border border-white/10 bg-black/40 pl-4 pr-16 text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
+                USDT
+              </span>
+            </div>
           </div>
 
           {/* Transaction URL */}
           <div>
-            <label className="block text-sm text-zinc-400 mb-2">
-              Transaction URL ({selectedNetwork === "BEP20" ? "BSCScan" : "Tronscan"} link)
+            <label className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5 block">
+              Transaction URL
             </label>
             <input
               type="url"
               value={transactionUrl}
               onChange={(e) => setTransactionUrl(e.target.value)}
-              placeholder={
-                selectedNetwork === "BEP20"
-                  ? "https://bscscan.com/tx/..."
-                  : "https://tronscan.org/#/transaction/..."
-              }
-              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-300"
+              placeholder={selectedNetwork === "BEP20" ? "bscscan.com/tx/..." : "tronscan.org/#/transaction/..."}
+              className="w-full h-11 rounded-xl border border-white/10 bg-black/40 px-4 text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
             />
           </div>
 
           {/* Screenshot Upload */}
           <div>
-            <label className="block text-sm text-zinc-400 mb-2">
-              Transaction Screenshot
+            <label className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5 block">
+              Screenshot
             </label>
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-white/20 rounded-xl p-6 text-center cursor-pointer hover:border-blue-500/50 transition-colors"
+              className={`relative border border-dashed rounded-xl cursor-pointer transition-all ${
+                previewUrl 
+                  ? "border-green-500/30 bg-green-500/5" 
+                  : "border-white/10 hover:border-blue-500/30 hover:bg-blue-500/5"
+              }`}
             >
               {previewUrl ? (
-                <div className="relative">
+                <div className="p-2 flex items-center gap-3">
                   <img
                     src={previewUrl}
                     alt="Preview"
-                    className="max-h-48 mx-auto rounded-lg"
+                    className="w-16 h-16 object-cover rounded-lg"
                   />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-green-400 flex items-center gap-1.5">
+                      <LuCircleCheck size={14} /> Image attached
+                    </p>
+                    <p className="text-xs text-zinc-500 truncate">{screenshot?.name}</p>
+                  </div>
                   <button
                     type="button"
                     onClick={clearScreenshot}
-                    className="absolute top-2 right-2 w-6 h-6 bg-red-500 rounded-full text-white flex items-center justify-center"
+                    className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors"
                   >
-                    <LuX size={14} />
+                    <LuX size={16} />
                   </button>
                 </div>
               ) : (
-                <>
-                  <LuCamera size={40} className="text-zinc-500 mx-auto mb-2" />
-                  <p className="text-zinc-400">
-                    Click to upload screenshot
-                  </p>
-                  <p className="text-xs text-zinc-500 mt-1">
-                    PNG, JPG, WEBP (max 5MB)
-                  </p>
-                </>
+                <div className="py-6 text-center">
+                  <LuUpload size={24} className="text-zinc-500 mx-auto mb-2" />
+                  <p className="text-sm text-zinc-400">Upload screenshot</p>
+                  <p className="text-[10px] text-zinc-600 mt-0.5">PNG, JPG, WEBP • Max 5MB</p>
+                </div>
               )}
             </div>
             <input
@@ -312,16 +292,43 @@ export default function ManualDeposit({
             />
           </div>
 
-          {/* Submit */}
+          {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading}
-            className="w-full btn-primary rounded-xl px-6 py-4 font-semibold text-center transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            disabled={loading || !amount || !transactionUrl || !screenshot}
+            className="w-full h-12 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-semibold hover:from-blue-400 hover:to-purple-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
           >
-            {loading ? "Submitting..." : "Submit Deposit Request"}
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Submitting...
+              </span>
+            ) : (
+              <>
+                <LuSend size={16} /> Submit Deposit
+              </>
+            )}
           </button>
+        </form>
+      </div>
+
+      {/* Footer */}
+      <div className="px-4 py-3 border-t border-white/5 space-y-2">
+        <div className="flex items-center justify-center gap-6 text-xs text-zinc-500">
+          <span className="flex items-center gap-1.5">
+            <LuShieldCheck size={14} className="text-green-500" /> Secure
+          </span>
+          <span className="flex items-center gap-1.5">
+            <LuClock size={14} className="text-blue-500" /> 24h Review
+          </span>
+          <span className="flex items-center gap-1.5">
+            <LuCircleCheck size={14} className="text-purple-500" /> Manual Verify
+          </span>
         </div>
-      </form>
+        <p className="text-center text-[11px] text-zinc-600">
+          Credited to Main Wallet after admin approval
+        </p>
+      </div>
     </motion.div>
   );
 }

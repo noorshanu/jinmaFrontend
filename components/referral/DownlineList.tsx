@@ -48,35 +48,23 @@ export default function DownlineList({ downline }: DownlineListProps) {
       ) : (
         <div className="divide-y divide-white/10">
           {downline.map((user) => (
-            <div key={user.id} className="p-6 hover:bg-white/5 transition-colors">
-              <div className="flex items-center justify-between">
+            <div key={user.id} className="p-4 hover:bg-white/5 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-white font-semibold">
+                  {user.name.charAt(0).toUpperCase()}
+                </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-white font-medium">{user.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-white font-medium">{user.name.split(' ')[0]}</h3>
                     {user.isTradingActive ? (
                       <LuCircleCheck className="w-4 h-4 text-green-400" title="Trading Active" />
                     ) : (
                       <LuCircleX className="w-4 h-4 text-yellow-400" title="Trading Inactive" />
                     )}
                   </div>
-                  <p className="text-zinc-400 text-sm">{user.email}</p>
-                  <p className="text-zinc-500 text-xs mt-1 flex items-center gap-3">
-                    <span className="flex items-center gap-1">
-                      <LuCalendar className="w-3 h-3" />
-                      Joined {formatDate(user.joinedAt)}
-                    </span>
-                    {user.totalReferrals > 0 && (
-                      <span className="flex items-center gap-1">
-                        <LuUsers className="w-3 h-3" />
-                        {user.totalReferrals} referrals
-                      </span>
-                    )}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-zinc-400">Their Earnings</p>
-                  <p className="text-lg font-semibold text-white">
-                    ${user.referralEarnings.toFixed(2)}
+                  <p className="text-zinc-500 text-xs flex items-center gap-1 mt-0.5">
+                    <LuCalendar className="w-3 h-3" />
+                    Joined {formatDate(user.joinedAt)}
                   </p>
                 </div>
               </div>

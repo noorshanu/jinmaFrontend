@@ -15,6 +15,7 @@ export default function TransferPage() {
   const [wallet, setWallet] = useState<WalletResponse["wallet"] | null>(null);
   const [amount, setAmount] = useState("");
   const [direction, setDirection] = useState<"toMovement" | "toMain">("toMovement");
+  const [showTradingNotice, setShowTradingNotice] = useState(false);
 
   const fetchWallet = useCallback(async () => {
     try {
@@ -68,6 +69,12 @@ export default function TransferPage() {
         setSuccessMessage(message);
         setAmount("");
         await fetchWallet();
+        
+        // Show trading activation notice after Main → Movement transfer
+        if (direction === "toMovement") {
+          setShowTradingNotice(true);
+        }
+        
         setTimeout(() => setSuccessMessage(null), 8000);
       }
     } catch (err: unknown) {
@@ -431,6 +438,47 @@ export default function TransferPage() {
                   : "Confirm Transfer"}
               </button>
             </form>
+
+            {/* Trading Activation Notice */}
+            <AnimatePresence>
+              {showTradingNotice && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="mt-6 p-5 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-xl"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                      <span className="text-2xl">📢</span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-blue-300 mb-2">
+                        Trading Activation Required
+                      </h3>
+                      <p className="text-blue-400/80 text-sm mb-3">
+                        Your funds have been transferred to your Movement Account. To start trading,
+                        please <strong>contact admin to activate your trading status</strong>.
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <Link
+                          href="/dashboard"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/20 text-blue-300 rounded-lg text-sm font-medium hover:bg-blue-500/30 transition-colors"
+                        >
+                          Go to Dashboard
+                        </Link>
+                        <button
+                          onClick={() => setShowTradingNotice(false)}
+                          className="text-blue-400/60 hover:text-blue-400 text-sm transition-colors"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         </div>
       </div>

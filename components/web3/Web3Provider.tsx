@@ -3,14 +3,14 @@
 import "@rainbow-me/rainbowkit/styles.css";
 import { getDefaultConfig, RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
 import { WagmiProvider } from "wagmi";
-import { mainnet, bsc } from "wagmi/chains";
+import { bsc } from "wagmi/chains";
 import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
 
-// Configure wagmi with ETH mainnet and BSC
+// Configure wagmi with BSC only (Tron is handled separately as it's not EVM-compatible)
 const config = getDefaultConfig({
   appName: "MarketProject",
   projectId: "2f4da7b40d4f371ee01ffcee4851dff2",
-  chains: [mainnet, bsc],
+  chains: [bsc],
   ssr: true,
 });
 

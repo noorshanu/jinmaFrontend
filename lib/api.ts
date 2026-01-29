@@ -19,6 +19,22 @@ export interface LoginResponse {
   };
 }
 
+export interface UserProfileResponse {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  referralCode: string;
+  referredBy: string | null;
+  role: string;
+  isActive: boolean;
+  isTradingActive: boolean;
+  tradingActivatedAt: string | null;
+  grade: string;
+  personalTurnover: number;
+  createdAt: string;
+}
+
 export interface SignupOTPResponse {
   email: string;
 }
@@ -545,6 +561,11 @@ class ApiClient {
 
   async getSalaryHistory(): Promise<ApiResponse<{ payments: SalaryPayment[] }>> {
     return this.request<{ payments: SalaryPayment[] }>('/grades/salary-history');
+  }
+
+  // User profile
+  async getUserProfile(): Promise<ApiResponse<UserProfileResponse>> {
+    return this.request<UserProfileResponse>('/user/profile');
   }
 }
 
