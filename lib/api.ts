@@ -120,6 +120,29 @@ export interface DepositResponse {
   };
 }
 
+export interface WalletActivityItem {
+  type: 'deposit' | 'transfer' | 'admin_credit';
+  id: string;
+  amount: number;
+  description: string;
+  createdAt: string;
+  depositType?: string;
+  direction?: string;
+  status?: string;
+  adminDisplayName?: string;
+  note?: string | null;
+}
+
+export interface WalletActivityResponse {
+  activities: WalletActivityItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
 export interface DepositHistoryResponse {
   deposits: Array<{
     id: string;
@@ -232,6 +255,7 @@ export interface SignalHistoryItem {
   committedAmount: number;
   outcome: 'PENDING' | 'PROFIT' | 'LOSS' | 'CANCELLED';
   resultAmount: number;
+  profitPercent?: number;
   confirmedAt: string;
   settledAt: string | null;
   movementBalanceBefore: number;
@@ -263,6 +287,25 @@ export interface ConfirmSignalResponse {
   movementBalanceBefore: number;
   lockedBalance: number;
   availableBalance: number;
+}
+
+export interface SignalUsageResponse {
+  id: string;
+  signal: {
+    id: string;
+    title: string;
+    type: string;
+    timeSlot: string;
+    expiresAt: string;
+  } | null;
+  committedAmount: number;
+  outcome: 'PENDING' | 'PROFIT' | 'LOSS' | 'CANCELLED';
+  resultAmount: number;
+  profitPercent: number;
+  confirmedAt: string;
+  settledAt: string | null;
+  movementBalanceBefore: number;
+  movementBalanceAfter: number;
 }
 
 // Grade types
@@ -344,12 +387,23 @@ class ApiClient {
       const data = await response.json();
 
       if (!response.ok) {
+        // Handle rate limiting – throw with a known message so callers can retry quietly
+        if (response.status === 429) {
+          throw new Error('Too many requests. Please wait a moment and try again.');
+        }
         throw new Error(data.message || 'An error occurred');
       }
 
       return data;
     } catch (error) {
       if (error instanceof Error) {
+        // Don't log to console: 429 (rate limit) or Failed to fetch (network) – callers handle retry
+        const msg = error.message;
+        const isRateLimit = msg.includes('Too many requests');
+        const isNetworkError = msg === 'Failed to fetch' || msg.includes('NetworkError');
+        if (!isRateLimit && !isNetworkError) {
+          console.error('API Error:', msg);
+        }
         throw error;
       }
       throw new Error('An unexpected error occurred');
@@ -469,6 +523,10 @@ class ApiClient {
     return this.request<TransferHistoryResponse>(`/wallet/transfers?page=${page}&limit=${limit}`);
   }
 
+  async getWalletActivity(page = 1, limit = 20): Promise<ApiResponse<WalletActivityResponse>> {
+    return this.request<WalletActivityResponse>(`/wallet/activity?page=${page}&limit=${limit}`);
+  }
+
   // Withdrawal endpoints
   async getWithdrawalSettings(): Promise<ApiResponse<WithdrawalSettingsResponse>> {
     return this.request<WithdrawalSettingsResponse>('/withdrawal/settings');
@@ -542,6 +600,10 @@ class ApiClient {
     return this.request<ConfirmSignalResponse>(`/signals/${signalId}/confirm`, {
       method: 'POST',
     });
+  }
+
+  async getSignalUsage(usageId: string): Promise<ApiResponse<SignalUsageResponse>> {
+    return this.request<SignalUsageResponse>(`/signals/usage/${usageId}`);
   }
 
   // Grade endpoints

@@ -1,64 +1,161 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useState, useEffect, Suspense, useMemo } from "react";
+import { useState, useEffect, Suspense, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import DashboardNavbar from "@/components/DashboardNavbar";
-import { apiClient, WalletResponse, UserProfileResponse } from "@/lib/api";
+import {
+  apiClient,
+  WalletResponse,
+  UserProfileResponse,
+  SignalUsageResponse,
+  Signal,
+  SignalHistoryItem,
+} from "@/lib/api";
+import {
+  LuClock,
+  LuTrendingUp,
+  LuTrendingDown,
+  LuTriangleAlert,
+  LuRefreshCw,
+  LuArrowRight,
+  LuTicket,
+} from "react-icons/lu";
 
-type TradeResult = "PENDING" | "WIN" | "LOSS";
+type TradePhase = "READY" | "CONFIRMED" | "WAITING" | "SETTLED";
+
+interface SignalData {
+  signalId: string;
+  signalTitle: string;
+  signalType: "DAILY" | "REFERRAL";
+  commitPercent: number;
+  timeSlot: string;
+}
 
 function TradeContent() {
   const searchParams = useSearchParams();
-  const couponCode = searchParams.get("signal") || "SIGNAL-A";
-  const [timeRemaining, setTimeRemaining] = useState(30); // 30 seconds session
-  const [isConfirmed, setIsConfirmed] = useState(false);
-  const [tradeResult, setTradeResult] = useState<TradeResult>("PENDING");
+
+  // Signal from URL (when coming from Signals page)
+  const signalDataFromUrl: SignalData | null = useMemo(() => {
+    const signalId = searchParams.get("signalId");
+    const signalTitle = searchParams.get("signalTitle");
+    const signalType = searchParams.get("signalType") as "DAILY" | "REFERRAL";
+    const commitPercent = searchParams.get("commitPercent");
+    const timeSlot = searchParams.get("timeSlot") || "";
+    if (!signalId || !signalTitle || !signalType || !commitPercent) return null;
+    return {
+      signalId,
+      signalTitle,
+      signalType,
+      commitPercent: parseFloat(commitPercent),
+      timeSlot,
+    };
+  }, [searchParams]);
+
+  // Current trade signal (from URL or set after confirm from list)
+  const [signalData, setSignalData] = useState<SignalData | null>(signalDataFromUrl);
+
+  // Sync URL params to state when they change
+  useEffect(() => {
+    if (signalDataFromUrl) setSignalData(signalDataFromUrl);
+  }, [signalDataFromUrl]);
+
+  // Available signals & history (for main view)
+  const [availableSignals, setAvailableSignals] = useState<Signal[]>([]);
+  const [limits, setLimits] = useState<{ dailySignalsRemaining: number; referralSignalsRemaining: number } | null>(null);
+  const [loadingSignals, setLoadingSignals] = useState(true);
+  const [history, setHistory] = useState<SignalHistoryItem[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  // Confirm modal: which signal user wants to use
+  const [selectedSignalForConfirm, setSelectedSignalForConfirm] = useState<Signal | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+
+  // Wallet & profile
   const [wallet, setWallet] = useState<WalletResponse["wallet"] | null>(null);
   const [loadingWallet, setLoadingWallet] = useState(true);
-  const [walletError, setWalletError] = useState<string | null>(null);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [showResultModal, setShowResultModal] = useState(false);
-  
-  // Trading status
   const [userProfile, setUserProfile] = useState<UserProfileResponse | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
-  // For now, use a fixed coupon percentage; later this can come from backend
-  const couponPercentage = 10;
+  // Trade in progress
+  const [phase, setPhase] = useState<TradePhase>("READY");
+  const [usageId, setUsageId] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState<Date | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState<number>(0);
+  const [committedAmount, setCommittedAmount] = useState<number>(0);
+  const [tradeResult, setTradeResult] = useState<SignalUsageResponse | null>(null);
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [pollingResult, setPollingResult] = useState(false);
 
   const movementBalance = wallet?.movementBalance ?? 0;
   const betAmount = useMemo(
-    () => movementBalance * (couponPercentage / 100),
-    [movementBalance, couponPercentage]
+    () =>
+      selectedSignalForConfirm
+        ? movementBalance * (selectedSignalForConfirm.commitPercent / 100)
+        : signalData
+          ? movementBalance * (signalData.commitPercent / 100)
+          : 0,
+    [movementBalance, selectedSignalForConfirm, signalData]
   );
 
-  // Fetch real wallet (movement balance) and user profile
+  const getCurrentUTCTime = () => {
+    const now = new Date();
+    return (
+      now.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        timeZone: "UTC",
+        hour12: true,
+      }) + " UTC"
+    );
+  };
+
+  const getTradingTime = (timeSlot: string) => {
+    switch (timeSlot) {
+      case "MORNING":
+        return "9:00 AM UTC";
+      case "EVENING":
+        return "7:00 PM UTC";
+      case "AFTERNOON":
+      case "REFERRAL":
+        return "3:00 PM UTC";
+      default:
+        return getCurrentUTCTime();
+    }
+  };
+
+  const formatTimeRemaining = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const formatDate = (dateStr: string) => new Date(dateStr).toLocaleString();
+
+  // Fetch wallet & profile
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoadingWallet(true);
         setLoadingProfile(true);
-        setWalletError(null);
-        
         const [walletRes, profileRes] = await Promise.all([
           apiClient.getWallet(),
           apiClient.getUserProfile(),
         ]);
-        
-        if (walletRes.success && walletRes.data) {
-          setWallet(walletRes.data.wallet);
-        }
-        
-        if (profileRes.success && profileRes.data) {
-          setUserProfile(profileRes.data);
-        }
-      } catch (err: unknown) {
-        setWalletError(
-          err instanceof Error ? err.message : "Failed to load wallet balance."
-        );
+        if (walletRes.success && walletRes.data) setWallet(walletRes.data.wallet);
+        if (profileRes.success && profileRes.data) setUserProfile(profileRes.data);
+      } catch {
+        // ignore
       } finally {
         setLoadingWallet(false);
         setLoadingProfile(false);
@@ -67,692 +164,597 @@ function TradeContent() {
     void fetchData();
   }, []);
 
-  // Load TradingView BTC chart
+  // Fetch available signals & history (when not in trade-in-progress)
+  useEffect(() => {
+    if (phase !== "READY" || usageId) return;
+    const fetchSignalsAndHistory = async () => {
+      setLoadingSignals(true);
+      setLoadingHistory(true);
+      try {
+        const [signalsRes, historyRes] = await Promise.all([
+          apiClient.getAvailableSignals(),
+          apiClient.getSignalHistory(1, 20),
+        ]);
+        if (signalsRes.success && signalsRes.data) {
+          setAvailableSignals(signalsRes.data.signals);
+          setLimits(signalsRes.data.limits);
+        }
+        if (historyRes.success && historyRes.data) {
+          setHistory(historyRes.data.history);
+        }
+      } catch {
+        // ignore
+      } finally {
+        setLoadingSignals(false);
+        setLoadingHistory(false);
+      }
+    };
+    void fetchSignalsAndHistory();
+  }, [phase, usageId]);
+
+  // Load TradingView BTC chart (always)
   useEffect(() => {
     if (typeof window === "undefined") return;
-
-    // Avoid injecting the script multiple times
     if (document.getElementById("tradingview-widget-script")) {
-      // @ts-expect-error TradingView injected by external script
-      if (window.TradingView) {
+      try {
         // @ts-expect-error TradingView injected by external script
-        new window.TradingView.widget({
-          container_id: "tv-btc-chart",
-          symbol: "BINANCE:BTCUSDT",
-          interval: "15",
-          theme: "dark",
-          style: "1",
-          locale: "en",
-          hide_top_toolbar: false,
-          hide_legend: false,
-          withdateranges: true,
-          allow_symbol_change: false,
-          autosize: true,
-        });
+        if (window.TradingView) {
+          // @ts-expect-error TradingView injected by external script
+          new window.TradingView.widget({
+            container_id: "tv-btc-chart",
+            symbol: "BINANCE:BTCUSDT",
+            interval: "15",
+            theme: "dark",
+            style: "1",
+            locale: "en",
+            hide_top_toolbar: false,
+            hide_legend: false,
+            withdateranges: true,
+            allow_symbol_change: false,
+            autosize: true,
+          });
+        }
+      } catch {
+        // ignore
       }
       return;
     }
-
     const script = document.createElement("script");
     script.id = "tradingview-widget-script";
     script.src = "https://s3.tradingview.com/tv.js";
     script.async = true;
     script.onload = () => {
-      // @ts-expect-error TradingView injected by external script
-      if (window.TradingView) {
+      try {
         // @ts-expect-error TradingView injected by external script
-        new window.TradingView.widget({
-          container_id: "tv-btc-chart",
-          symbol: "BINANCE:BTCUSDT",
-          interval: "15",
-          theme: "dark",
-          style: "1",
-          locale: "en",
-          hide_top_toolbar: false,
-          hide_legend: false,
-          withdateranges: true,
-          allow_symbol_change: false,
-          autosize: true,
-        });
+        if (window.TradingView) {
+          // @ts-expect-error TradingView injected by external script
+          new window.TradingView.widget({
+            container_id: "tv-btc-chart",
+            symbol: "BINANCE:BTCUSDT",
+            interval: "15",
+            theme: "dark",
+            style: "1",
+            locale: "en",
+            hide_top_toolbar: false,
+            hide_legend: false,
+            withdateranges: true,
+            allow_symbol_change: false,
+            autosize: true,
+          });
+        }
+      } catch {
+        // ignore
       }
     };
     document.body.appendChild(script);
-
-    return () => {
-      // We do not remove tv.js to allow reuse across navigations
-    };
   }, []);
 
-  // Countdown timer and result calculation
+  // Countdown
   useEffect(() => {
-    if (!isConfirmed || timeRemaining <= 0) return;
-
-    const timer = setInterval(() => {
-      setTimeRemaining((prev) => prev - 1);
-    }, 1000);
-
+    if (!expiresAt || phase === "SETTLED") return;
+    const update = () => {
+      const remaining = Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
+      setTimeRemaining(remaining);
+      if (remaining === 0 && phase === "WAITING") setPhase("SETTLED");
+    };
+    update();
+    const timer = setInterval(update, 1000);
     return () => clearInterval(timer);
-  }, [isConfirmed, timeRemaining]);
+  }, [expiresAt, phase]);
 
-  // When timer finishes, generate a mock result (for UI)
-  useEffect(() => {
-    if (isConfirmed && timeRemaining === 0 && tradeResult === "PENDING") {
-      const win = Math.random() < 0.6; // 60% chance win, just for demo
-      const result: TradeResult = win ? "WIN" : "LOSS";
-      setTradeResult(result);
-      setShowResultModal(true);
+  // Poll for result
+  const pollForResult = useCallback(async (): Promise<{ done: boolean; isRateLimited?: boolean }> => {
+    if (!usageId || pollingResult) return { done: false };
+    setPollingResult(true);
+    try {
+      const res = await apiClient.getSignalUsage(usageId);
+      if (res.success && res.data && res.data.outcome !== "PENDING") {
+        setTradeResult(res.data);
+        setShowResultModal(true);
+        return { done: true };
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("Too many requests") || msg === "Failed to fetch") return { done: false, isRateLimited: true };
+    } finally {
+      setPollingResult(false);
     }
-  }, [isConfirmed, timeRemaining, tradeResult]);
+    return { done: false };
+  }, [usageId, pollingResult]);
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
+  useEffect(() => {
+    if (phase !== "SETTLED" || !usageId) return;
+    let attempts = 0;
+    const poll = async () => {
+      const { done, isRateLimited } = await pollForResult();
+      if (done || attempts >= 20) return;
+      attempts++;
+      setTimeout(poll, isRateLimited ? 8000 : 3000);
+    };
+    poll();
+  }, [phase, usageId, pollForResult]);
 
-  const handleUseCoupon = () => {
-    setShowConfirmModal(true);
-  };
-
-  const handleConfirmTrade = () => {
-    setShowConfirmModal(false);
-    setIsConfirmed(true);
-    setTimeRemaining(30);
-    setTradeResult("PENDING");
-    // TODO: call backend to lock amount & create trade session
-  };
-
-  const handleCancelTrade = () => {
-    setShowConfirmModal(false);
-  };
-
-  const handleCloseResultModal = () => {
-    setShowResultModal(false);
-  };
-
-  // Trading restrictions
   const isTradingActive = userProfile?.isTradingActive ?? false;
   const hasMinBalance = movementBalance >= 250;
   const canTrade = hasMinBalance && isTradingActive;
-  const isCheckingStatus = loadingWallet || loadingProfile;
-  
-  // Restriction messages
-  const getTradingRestrictionMessage = () => {
-    if (!hasMinBalance) {
-      return {
-        type: "balance" as const,
-        title: "Insufficient Balance",
-        message: "Your Movement Wallet balance is below $250. Please add balance to start trading.",
-      };
+  const restriction = !hasMinBalance
+    ? { type: "balance" as const, title: "Insufficient Balance", message: "Movement balance below $250. Add balance to trade." }
+    : !isTradingActive
+      ? { type: "inactive" as const, title: "Trading Deactivated", message: "Contact admin to reactivate trading." }
+      : null;
+
+  const handleConfirmTrade = async () => {
+    const signal = selectedSignalForConfirm;
+    if (!signal) return;
+    setConfirming(true);
+    setConfirmError(null);
+    try {
+      const res = await apiClient.confirmSignal(signal.id);
+      if (res.success && res.data) {
+        setSignalData({
+          signalId: signal.id,
+          signalTitle: signal.title,
+          signalType: signal.type,
+          commitPercent: signal.commitPercent,
+          timeSlot: signal.timeSlot,
+        });
+        setUsageId(res.data.id);
+        setCommittedAmount(res.data.committedAmount);
+        setExpiresAt(new Date(res.data.settlesAt));
+        setSelectedSignalForConfirm(null);
+        setPhase("WAITING");
+      }
+    } catch (err: unknown) {
+      setConfirmError(err instanceof Error ? err.message : "Failed to confirm trade");
+    } finally {
+      setConfirming(false);
     }
-    if (!isTradingActive) {
-      return {
-        type: "inactive" as const,
-        title: "Trading Deactivated",
-        message: "Your trading account is deactivated. Please contact admin to reactivate your trading status.",
-      };
-    }
-    return null;
   };
-  
-  const restriction = getTradingRestrictionMessage();
+
+  const pendingHistory = history.filter((h) => h.outcome === "PENDING");
+  const settledHistory = history.filter((h) => h.outcome !== "PENDING");
 
   return (
     <>
       <DashboardNavbar />
       <div className="min-h-screen bg-grid pt-24 pb-8 px-4">
-      <div className="max-w-5xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
-          {/* <Link
-            href="/dashboard/coupons"
-            className="text-blue-400 hover:text-blue-300 text-sm mb-4 inline-block transition-colors"
-          >
-            ← Back to Coupons
-          </Link> */}
-          {/* <h1 className="text-3xl md:text-4xl font-bold mb-2">
-            <span className="bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
-              Trading Session
-            </span>
-          </h1> */}
-          {/* <p className="text-zinc-400">Use your coupon to trade BTC/USDT</p> */}
-        </motion.div>
+        <div className="max-w-5xl mx-auto">
+          {/* Page title */}
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+            <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
+              Trade
+            </h1>
+            <p className="text-zinc-400 text-sm mt-1">BTC/USDT • Use a signal to start a trade</p>
+          </motion.div>
 
-        {/* BTC Live Chart */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-xl"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <p className="text-sm text-zinc-400">BTC/USDT Live Chart</p>
-              <p className="text-lg font-semibold text-white">TradingView</p>
-            </div>
-          </div>
-          <div className="relative h-[460px] w-full overflow-hidden  bg-black/40">
-            <div id="tv-btc-chart" className="h-full w-full" />
-          </div>
-        </motion.div>
-
-        {/* Trading Restriction Warning */}
-        {!isCheckingStatus && restriction && (
+          {/* 1. BTC Live Chart - always visible */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`mb-6 p-5 rounded-xl border ${
-              restriction.type === "balance"
-                ? "bg-yellow-500/10 border-yellow-500/30"
-                : "bg-orange-500/10 border-orange-500/30"
-            }`}
+            className="mb-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-xl"
           >
-            <div className="flex items-start gap-4">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-                restriction.type === "balance"
-                  ? "bg-yellow-500/20"
-                  : "bg-orange-500/20"
-              }`}>
-                <span className="text-2xl">{restriction.type === "balance" ? "💰" : "⚠️"}</span>
-              </div>
-              <div className="flex-1">
-                <h3 className={`text-lg font-semibold mb-2 ${
-                  restriction.type === "balance" ? "text-yellow-300" : "text-orange-300"
-                }`}>
-                  {restriction.title}
-                </h3>
-                <p className={`text-sm ${
-                  restriction.type === "balance" ? "text-yellow-400/80" : "text-orange-400/80"
-                }`}>
-                  {restriction.message}
-                </p>
-                {restriction.type === "balance" && (
-                  <Link
-                    href="/dashboard/transfer"
-                    className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/20 text-yellow-300 rounded-lg text-sm font-medium hover:bg-yellow-500/30 transition-colors"
-                  >
-                    Add Balance →
-                  </Link>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {!isConfirmed ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-xl"
-          >
-          {/* Coupon Info */}
-          <div className="mb-6">
-            <p className="text-sm text-zinc-400 mb-2">Available Signal</p>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className={`rounded-xl border p-4 ${
-                canTrade 
-                  ? "border-blue-500/30 bg-blue-500/10" 
-                  : "border-zinc-500/30 bg-zinc-500/10 opacity-60"
-              }`}>
-                <p className={`text-xs uppercase tracking-wide mb-1 ${
-                  canTrade ? "text-blue-300" : "text-zinc-400"
-                }`}>
-                  Signal
-                </p>
-                <p className="text-lg font-semibold text-white mb-1">{couponCode}</p>
-                <p className={`text-sm mb-3 ${canTrade ? "text-blue-200" : "text-zinc-400"}`}>
-                  Uses <span className="font-semibold">{couponPercentage}%</span> of your Movement
-                  Account balance.
-                </p>
-                <button
-                  onClick={handleUseCoupon}
-                  disabled={!canTrade || isCheckingStatus}
-                  className={`inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                    canTrade && !isCheckingStatus
-                      ? "bg-blue-500 text-white hover:bg-blue-400"
-                      : "bg-zinc-600 text-zinc-400 cursor-not-allowed"
-                  }`}
-                  title={!canTrade ? restriction?.message : undefined}
-                >
-                  {isCheckingStatus ? "Checking..." : "Use Signal"}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Trading Details */}
-            <div className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                  <p className="text-zinc-400 text-sm mb-1">Movement Account Balance</p>
-                  <p className="text-2xl font-bold text-white">
-                  {loadingWallet
-                    ? "Loading..."
-                    : walletError
-                    ? "Error"
-                    : `$${movementBalance.toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}`}
-                  </p>
-                </div>
-                <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                  <p className="text-zinc-400 text-sm mb-1">Signal Percentage</p>
-                  <p className="text-2xl font-bold text-white">{couponPercentage}%</p>
-                </div>
-              </div>
-
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <p className="text-blue-300 font-medium">Bet Amount</p>
-                  <p className="text-3xl font-bold text-blue-400">
-                    ${betAmount.toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </p>
-                </div>
-                <p className="text-xs text-blue-400/70">
-                  This amount will be locked from your Movement Account during the trading session
-                </p>
-              </div>
-
-              {/* Trading Info */}
-              <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                <h3 className="text-white font-semibold mb-3">Trading Details</h3>
-                <div className="space-y-2 text-sm text-zinc-300">
-                  <div className="flex justify-between">
-                    <span>Pair:</span>
-                    <span className="font-medium">BTC/USDT</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Session Duration:</span>
-                    <span className="font-medium">30 seconds</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Possible Profit:</span>
-                    <span className="font-medium text-green-400">+50% to +70%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Possible Loss:</span>
-                    <span className="font-medium text-red-400">-100%</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Warning */}
-              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
-                <p className="text-yellow-400 text-sm">
-                  ⚠️ Once confirmed, the amount will be locked and results will be credited after 30 seconds.
-                  You cannot cancel the trade after confirmation.
-                </p>
-              </div>
-
-              {/* Confirm Button */}
-              <button
-                onClick={handleUseCoupon}
-                disabled={!canTrade || isCheckingStatus}
-                className={`w-full rounded-xl px-6 py-4 font-semibold text-center transition-all duration-300 ${
-                  canTrade && !isCheckingStatus
-                    ? "btn-primary hover:scale-105 hover:shadow-lg hover:shadow-blue-500/25"
-                    : "bg-zinc-600 text-zinc-400 cursor-not-allowed"
-                }`}
-                title={!canTrade ? restriction?.message : undefined}
-              >
-                {isCheckingStatus ? "Checking Status..." : "Confirm Trade"}
-              </button>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-          className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-xl grid gap-8 md:grid-cols-[2fr,1.3fr]"
-          >
-          {/* Left side: progress & timer */}
-          <div className="text-center">
-            <div className="mb-6">
-              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-blue-500/20 flex items-center justify-center">
-                <span className="text-4xl">⏳</span>
-              </div>
-              <h2 className="text-2xl font-bold text-white mb-2">
-                {timeRemaining > 0 ? "Trading in Progress" : "Trade Completed"}
-              </h2>
-              <p className="text-zinc-400">
-                {timeRemaining > 0
-                  ? "Your trade is being processed"
-                  : "Your result has been calculated"}
-              </p>
-            </div>
-
-            {/* Timer */}
-            <div className="mb-6">
-              <div className="text-6xl font-bold text-blue-400 mb-2">
-                {formatTime(timeRemaining)}
-              </div>
-              <p className="text-zinc-400 text-sm">
-                {timeRemaining > 0 ? "Time remaining until results" : "Session finished"}
-              </p>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="w-full bg-white/5 rounded-full h-2 mb-6">
-              <div
-                className="bg-blue-500 h-2 rounded-full transition-all duration-1000"
-                style={{ width: `${((30 - timeRemaining) / 30) * 100}%` }}
-              />
-            </div>
-
-            {/* Locked Amount Info */}
-            <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-              <p className="text-zinc-400 text-sm mb-1">Locked Amount</p>
-              <p className="text-2xl font-bold text-white">
-                ${betAmount.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </p>
-            </div>
-          </div>
-
-          {/* Right side: Result card */}
-          <div className="rounded-2xl bg-black/40 border border-white/10 p-6 flex flex-col justify-between">
-            <div>
-              <p className="text-sm text-zinc-400 mb-2">Trade Result</p>
-              {tradeResult === "PENDING" || timeRemaining > 0 ? (
-                <p className="text-lg text-zinc-300">
-                  Result will be available once the session ends.
-                </p>
-              ) : tradeResult === "WIN" ? (
-                <>
-                  <p className="text-3xl font-bold text-green-400 mb-2">WIN</p>
-                  <p className="text-sm text-green-300 mb-4">
-                    Congratulations! Your signal trade finished in profit.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-3xl font-bold text-red-400 mb-2">LOSS</p>
-                  <p className="text-sm text-red-300 mb-4">
-                    This time the trade closed at a loss. Your locked amount has been
-                    deducted.
-                  </p>
-                </>
-              )}
-            </div>
-
-            <div className="mt-4 space-y-2 text-sm text-zinc-300">
-              <div className="flex justify-between">
-                <span>Amount used:</span>
-                <span className="font-semibold">
-                  ${betAmount.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Trade Type:</span>
-                <span className="font-semibold">Signal ({couponCode})</span>
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <Link
-                href="/dashboard"
-                className="w-full inline-flex items-center justify-center rounded-xl bg-green-500 px-4 py-3 text-sm font-semibold text-black hover:bg-green-400 transition-colors"
-              >
-                Back to Dashboard
-              </Link>
-            </div>
-          </div>
-          </motion.div>
-        )}
-      </div>
-    </div>
-
-    {/* Confirm coupon modal */}
-    <AnimatePresence>
-      {showConfirmModal && (
-        <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            transition={{ type: "spring", stiffness: 260, damping: 22 }}
-            className="w-full max-w-md rounded-2xl bg-zinc-950/90 border border-white/10 shadow-2xl p-6 backdrop-blur-xl"
-          >
-            <div className="mb-4 text-center">
-              <p className="text-xs uppercase tracking-[0.2em] text-blue-400 mb-2">
-                Confirm Signal
-              </p>
-              <h3 className="text-xl font-semibold text-white mb-1">
-                Use {couponCode} for this trade?
-              </h3>
-              <p className="text-sm text-zinc-400">
-                This will lock{" "}
-                <span className="font-semibold text-blue-300">
-                  {couponPercentage}% of your Movement balance
-                </span>{" "}
-                ({movementBalance > 0
-                  ? `$${betAmount.toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}`
-                  : "balance not loaded yet"}
-                ) for a 30 second session.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between mb-6 rounded-xl bg-black/40 border border-white/10 px-4 py-3">
+            <div className="flex items-center justify-between mb-3">
               <div>
-                <p className="text-xs text-zinc-500">Movement Balance</p>
-                <p className="text-sm font-semibold text-white">
-                  {loadingWallet || !wallet
-                    ? "Loading..."
-                    : `$${movementBalance.toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}`}
-                </p>
+                <p className="text-sm text-zinc-400">BTC/USDT Live Chart</p>
+                <p className="text-lg font-semibold text-white">TradingView</p>
               </div>
-              <div className="text-right">
-                <p className="text-xs text-zinc-500">Amount to lock</p>
-                <p className="text-sm font-semibold text-blue-300">
-                  ${betAmount.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
-              </div>
+              <p className="text-xs text-zinc-500">{getCurrentUTCTime()}</p>
             </div>
-
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={handleCancelTrade}
-                className="w-1/2 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-sm font-medium text-zinc-200 hover:bg-zinc-800 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmTrade}
-                disabled={!canTrade}
-                className={`w-1/2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
-                  canTrade
-                    ? "bg-blue-500 text-white hover:bg-blue-400 shadow-lg shadow-blue-500/30"
-                    : "bg-zinc-600 text-zinc-400 cursor-not-allowed"
-                }`}
-              >
-                Confirm &amp; Start
-              </button>
+            <div className="relative h-[400px] w-full overflow-hidden bg-black/40 rounded-xl">
+              <div id="tv-btc-chart" className="h-full w-full" />
             </div>
           </motion.div>
-        </motion.div>
-      )}
 
-      {/* Result modal */}
-      {showResultModal && tradeResult !== "PENDING" && (
-        <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <motion.div
-            initial={{
-              opacity: 0,
-              scale: 0.8,
-              y: 30,
-            }}
-            animate={{
-              opacity: 1,
-              scale: 1,
-              y: 0,
-              boxShadow:
-                tradeResult === "WIN"
-                  ? "0 0 40px rgba(34,197,94,0.55)"
-                  : "0 0 40px rgba(248,113,113,0.4)",
-            }}
-            exit={{ opacity: 0, scale: 0.9, y: 10 }}
-            transition={{ type: "spring", stiffness: 260, damping: 20 }}
-            className="w-full max-w-lg rounded-3xl bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 border border-emerald-500/40 shadow-2xl p-6 md:p-8 backdrop-blur-2xl text-left relative overflow-hidden"
-          >
-            {/* Glow background */}
-            <div
-              className={`pointer-events-none absolute inset-x-0 -top-32 h-64 blur-3xl opacity-60 ${
-                tradeResult === "WIN"
-                  ? "bg-emerald-500/40"
-                  : "bg-red-500/30"
+          {/* Restriction warning */}
+          {restriction && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`mb-6 p-5 rounded-xl border ${
+                restriction.type === "balance"
+                  ? "bg-yellow-500/10 border-yellow-500/30"
+                  : "bg-orange-500/10 border-orange-500/30"
               }`}
-            />
-
-            {/* Content */}
-            <div className="relative flex flex-col md:flex-row gap-6">
-              <div className="flex-1">
-                <p className="text-xs uppercase tracking-[0.2em] text-emerald-300/80 mb-2">
-                  Trade Result
-                </p>
-                <motion.p
-                  key={tradeResult}
-                  initial={{ scale: 0.9, opacity: 0, y: -10 }}
-                  animate={{ scale: 1, opacity: 1, y: 0 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                  className={`text-4xl md:text-5xl font-extrabold mb-1 ${
-                    tradeResult === "WIN"
-                      ? "text-emerald-400"
-                      : "text-red-400"
-                  }`}
-                >
-                  {tradeResult === "WIN" ? "WIN" : "LOSS"}
-                </motion.p>
-                <p
-                  className={`text-sm md:text-base mb-4 ${
-                    tradeResult === "WIN"
-                      ? "text-emerald-300"
-                      : "text-red-300"
-                  }`}
-                >
-                  {tradeResult === "WIN"
-                    ? "+60% Profit (Demo)"
-                    : "-100% of committed amount"}
-                </p>
-
-                <div className="space-y-1 text-sm text-zinc-300 mb-5">
-                  <div className="flex justify-between">
-                    <span>Amount used:</span>
-                    <span className="font-semibold">
-                      ${betAmount.toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Trade Type:</span>
-                    <span className="font-semibold">
-                      Long (Signal {couponCode})
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-3 mt-2">
-                  {/* <button
-                    type="button"
-                    onClick={handleCloseResultModal}
-                    className="flex-1 rounded-xl bg-zinc-900/80 px-4 py-2.5 text-sm font-medium text-zinc-100 hover:bg-zinc-800 transition-colors border border-zinc-700/70"
-                  >
-                    Back to Trade
-                  </button> */}
-                  <Link
-                    href="/dashboard"
-                    className="flex-1 inline-flex items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-black hover:bg-emerald-400 transition-colors shadow-lg shadow-emerald-500/40"
-                  >
-                    Go to Dashboard
-                  </Link>
+            >
+              <div className="flex items-start gap-4">
+                <span className="text-2xl">{restriction.type === "balance" ? "💰" : "⚠️"}</span>
+                <div>
+                  <h3 className={`font-semibold ${restriction.type === "balance" ? "text-yellow-300" : "text-orange-300"}`}>
+                    {restriction.title}
+                  </h3>
+                  <p className="text-sm text-zinc-400 mt-1">{restriction.message}</p>
+                  {restriction.type === "balance" && (
+                    <Link
+                      href="/dashboard/transfer"
+                      className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/20 text-yellow-300 rounded-lg text-sm font-medium"
+                    >
+                      Add Balance →
+                    </Link>
+                  )}
                 </div>
               </div>
+            </motion.div>
+          )}
 
-              {/* Mini chart visual */}
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1 }}
-                className="w-full md:w-56 rounded-2xl bg-slate-950/70 border border-emerald-500/30 p-3 flex flex-col justify-between"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="h-7 w-7 rounded-full bg-amber-500/20 flex items-center justify-center text-xs">
-                      <span className="text-amber-300 font-semibold">₿</span>
-                    </div>
-                    <div>
-                      <p className="text-xs text-zinc-400">Asset</p>
-                      <p className="text-sm font-semibold text-white">
-                        BTC / USDT
-                      </p>
-                    </div>
-                  </div>
+          {/* 2. Trade in progress (countdown / result section) */}
+          {(phase === "WAITING" || phase === "SETTLED") && signalData && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mb-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-xl"
+            >
+              <div className="text-center">
+                <div className="mb-6">
+                  <span className="text-5xl">{timeRemaining > 0 ? "⏳" : pollingResult ? "🔄" : "✅"}</span>
+                  <h2 className="text-xl font-bold text-white mt-4">
+                    {timeRemaining > 0 ? "Trade in progress" : pollingResult ? "Calculating result..." : "Trade completed"}
+                  </h2>
                 </div>
-
-                <div className="relative h-28 w-full overflow-hidden rounded-xl bg-slate-900">
-                  <img
-                    src="/chart.png"
-                    alt="BTC result chart"
-                 
-                    className="object-cover opacity-90"
+                <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 mb-2">
+                  {formatTime(timeRemaining)}
+                </div>
+                <p className="text-zinc-400 text-sm mb-6">
+                  {signalData.signalTitle} • ${committedAmount.toFixed(2)} locked
+                </p>
+                <div className="w-full max-w-md mx-auto bg-white/5 rounded-full h-2 overflow-hidden">
+                  <motion.div
+                    className="bg-gradient-to-r from-blue-500 to-cyan-500 h-2 rounded-full"
+                    animate={{ width: `${timeRemaining <= 0 ? 100 : Math.max(0, 100 - (timeRemaining / 300) * 100)}%` }}
+                    transition={{ duration: 0.5 }}
                   />
                 </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* 3. Signals to use (when READY and no active trade from this page) */}
+          {phase === "READY" && !usageId && (
+            <>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl"
+              >
+                <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <LuTicket className="w-5 h-5 text-blue-400" />
+                  Signals to use
+                </h2>
+                {loadingSignals ? (
+                  <div className="flex items-center justify-center py-12">
+                    <LuRefreshCw className="w-8 h-8 text-blue-400 animate-spin" />
+                  </div>
+                ) : availableSignals.length === 0 ? (
+                  <div className="text-center py-12 rounded-xl bg-white/5 border border-white/10">
+                    <p className="text-zinc-400 font-medium">No signal</p>
+                    <p className="text-sm text-zinc-500 mt-1">There are no signals available to use right now.</p>
+                    <Link
+                      href="/dashboard/signals"
+                      className="mt-4 inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm"
+                    >
+                      View Signals page <LuArrowRight className="w-4 h-4" />
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {availableSignals.map((s) => (
+                      <div
+                        key={s.id}
+                        className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10"
+                      >
+                        <div>
+                          <p className="font-medium text-white">{s.title}</p>
+                          <p className="text-sm text-zinc-400">
+                            {s.timeSlot === "MORNING" ? "9:00 AM" : s.timeSlot === "EVENING" ? "7:00 PM" : "3:00 PM"} UTC •{" "}
+                            {s.commitPercent}% of balance • {formatTimeRemaining(s.timeRemaining)} left
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setSelectedSignalForConfirm(s)}
+                          disabled={!canTrade}
+                          className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-sm font-medium text-white hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title={!canTrade ? restriction?.message : undefined}
+                        >
+                          Use signal <LuArrowRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </motion.div>
-            </div>
+
+              {/* 4. Trade history */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl"
+              >
+                <h2 className="text-lg font-semibold text-white mb-4">Trade history</h2>
+                {loadingHistory ? (
+                  <div className="flex items-center justify-center py-8">
+                    <LuRefreshCw className="w-6 h-6 text-blue-400 animate-spin" />
+                  </div>
+                ) : history.length === 0 ? (
+                  <p className="text-zinc-400 text-center py-8">No trades yet</p>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingHistory.length > 0 && (
+                      <div className="mb-4">
+                        <p className="text-sm text-yellow-400 mb-2">Pending</p>
+                        {pendingHistory.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 mb-2"
+                          >
+                            <div>
+                              <p className="text-white text-sm font-medium">{item.signal?.title || "Signal"}</p>
+                              <p className="text-zinc-400 text-xs">{formatDate(item.confirmedAt)}</p>
+                            </div>
+                            <span className="text-yellow-400 text-sm font-medium">
+                              ${item.committedAmount.toFixed(2)} • Awaiting result
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-sm text-zinc-500 mb-2">Settled</p>
+                    {settledHistory.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                              item.outcome === "PROFIT" ? "bg-green-500/20" : "bg-red-500/20"
+                            }`}
+                          >
+                            {item.outcome === "PROFIT" ? (
+                              <LuTrendingUp className="w-5 h-5 text-green-400" />
+                            ) : (
+                              <LuTrendingDown className="w-5 h-5 text-red-400" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-white text-sm font-medium">{item.signal?.title || "Signal"}</p>
+                            <p className="text-zinc-400 text-xs">
+                              {item.settledAt ? formatDate(item.settledAt) : formatDate(item.confirmedAt)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p
+                            className={`font-semibold ${
+                              item.outcome === "PROFIT" ? "text-green-400" : "text-red-400"
+                            }`}
+                          >
+                            {item.outcome === "PROFIT" ? "+" : ""}${(item.resultAmount ?? 0).toFixed(2)}
+                            {item.outcome === "PROFIT" && item.profitPercent != null && item.profitPercent > 0 && (
+                              <span className="text-green-300/80 text-xs ml-1">(+{item.profitPercent}%)</span>
+                            )}
+                          </p>
+                          <p className="text-zinc-500 text-xs">Committed: ${item.committedAmount.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+
+              {/* If user came from Signals page with URL params */}
+              {signalDataFromUrl && availableSignals.some((x) => x.id === signalDataFromUrl.signalId) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-6 bg-blue-500/10 border border-blue-500/20 rounded-2xl p-6"
+                >
+                  <p className="text-blue-300 text-sm mb-2">You selected from Signals page</p>
+                  <p className="text-white font-medium">{signalDataFromUrl.signalTitle}</p>
+                  <p className="text-zinc-400 text-sm mt-1">
+                    {getTradingTime(signalDataFromUrl.timeSlot)} • {signalDataFromUrl.commitPercent}% of balance
+                  </p>
+                  <button
+                    onClick={() => {
+                      const s = availableSignals.find((x) => x.id === signalDataFromUrl.signalId);
+                      if (s) setSelectedSignalForConfirm(s);
+                    }}
+                    disabled={!canTrade}
+                    className="mt-4 flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50"
+                  >
+                    Use this signal <LuArrowRight className="w-4 h-4" />
+                  </button>
+                </motion.div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Confirm use signal modal */}
+      <AnimatePresence>
+        {selectedSignalForConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md rounded-2xl bg-gradient-to-br from-zinc-900 to-black border border-white/10 p-6 shadow-2xl"
+            >
+              <div className="text-center mb-4">
+                <div className="w-14 h-14 rounded-full bg-blue-500/20 flex items-center justify-center mx-auto mb-4">
+                  <LuTrendingUp className="w-7 h-7 text-blue-400" />
+                </div>
+                <h3 className="text-xl font-bold text-white">Confirm trade</h3>
+                <p className="text-zinc-400 text-sm mt-1">
+                  Use this signal to start a trade. Amount will be locked until result.
+                </p>
+              </div>
+              <div className="bg-white/5 rounded-xl p-4 mb-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-400">Signal</span>
+                  <span className="text-white font-medium">{selectedSignalForConfirm.title}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-400">Type</span>
+                  <span className="text-white">{selectedSignalForConfirm.type}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-400">Commit</span>
+                  <span className="text-white">{selectedSignalForConfirm.commitPercent}% of balance</span>
+                </div>
+                <div className="flex justify-between text-sm pt-2 border-t border-white/10">
+                  <span className="text-zinc-400">Amount to lock</span>
+                  <span className="text-green-400 font-bold">
+                    ${betAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+              {confirmError && (
+                <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                  <p className="text-red-400 text-sm">{confirmError}</p>
+                </div>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setSelectedSignalForConfirm(null);
+                    setConfirmError(null);
+                  }}
+                  disabled={confirming}
+                  className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-medium text-white hover:bg-white/10"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmTrade}
+                  disabled={confirming || !canTrade}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 py-3 text-sm font-semibold text-white hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {confirming ? (
+                    <>
+                      <LuRefreshCw className="w-4 h-4 animate-spin" />
+                      Confirming...
+                    </>
+                  ) : (
+                    <>
+                      Confirm & start trade <LuArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+
+      {/* Result modal */}
+      <AnimatePresence>
+        {showResultModal && tradeResult && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className={`w-full max-w-lg rounded-3xl border shadow-2xl p-8 ${
+                tradeResult.outcome === "PROFIT"
+                  ? "bg-gradient-to-b from-emerald-950/90 to-slate-950 border-emerald-500/40"
+                  : "bg-gradient-to-b from-red-950/90 to-slate-950 border-red-500/40"
+              }`}
+            >
+              <div className="text-center">
+                <span className="text-6xl">{tradeResult.outcome === "PROFIT" ? "🎉" : "📉"}</span>
+                <p
+                  className={`text-4xl font-extrabold mt-4 ${
+                    tradeResult.outcome === "PROFIT" ? "text-emerald-400" : "text-red-400"
+                  }`}
+                >
+                  {tradeResult.outcome === "PROFIT" ? "WIN!" : "LOSS"}
+                </p>
+                <p className="text-lg text-zinc-300 mt-2">
+                  {tradeResult.outcome === "PROFIT"
+                    ? `+${tradeResult.profitPercent}% profit`
+                    : "-100% of committed amount"}
+                </p>
+                <p className={`text-2xl font-bold mt-2 ${tradeResult.outcome === "PROFIT" ? "text-emerald-400" : "text-red-400"}`}>
+                  {tradeResult.outcome === "PROFIT" ? "+" : ""}
+                  ${Math.abs(tradeResult.resultAmount).toFixed(2)}
+                </p>
+                <div className="mt-6 space-y-2 text-sm text-zinc-400">
+                  <p>Committed: ${tradeResult.committedAmount.toFixed(2)}</p>
+                  <p>New balance: ${tradeResult.movementBalanceAfter.toFixed(2)}</p>
+                </div>
+                <div className="flex gap-3 mt-8">
+                  <Link
+                    href="/dashboard/trade"
+                    className="flex-1 rounded-xl bg-white/10 py-3 text-sm font-medium text-white hover:bg-white/20 text-center"
+                    onClick={() => setShowResultModal(false)}
+                  >
+                    Trade again
+                  </Link>
+                  <Link
+                    href="/dashboard"
+                    className={`flex-1 rounded-xl py-3 text-sm font-semibold text-center ${
+                      tradeResult.outcome === "PROFIT"
+                        ? "bg-emerald-500 text-black hover:bg-emerald-400"
+                        : "bg-blue-500 text-white hover:bg-blue-400"
+                    }`}
+                  >
+                    Dashboard
+                  </Link>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }
 
 export default function TradePage() {
   return (
-    <Suspense fallback={
-      <>
-        <DashboardNavbar />
-        <div className="min-h-screen bg-grid pt-24 pb-8 px-4 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p className="text-zinc-400">Loading trade session...</p>
+    <Suspense
+      fallback={
+        <>
+          <DashboardNavbar />
+          <div className="min-h-screen bg-grid pt-24 pb-8 px-4 flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4" />
+              <p className="text-zinc-400">Loading...</p>
+            </div>
           </div>
-        </div>
-      </>
-    }>
+        </>
+      }
+    >
       <TradeContent />
     </Suspense>
   );

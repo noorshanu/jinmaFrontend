@@ -3,20 +3,27 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import DashboardNavbar from "@/components/DashboardNavbar";
 import DashboardFooter from "@/components/DashboardFooter";
 import { apiClient, Signal, SignalLimits, SignalHistoryItem, UserProfileResponse, WalletResponse } from "@/lib/api";
-import { LuRefreshCw, LuClock, LuTrendingUp, LuTrendingDown } from "react-icons/lu";
+import { LuRefreshCw, LuClock, LuTrendingUp, LuTrendingDown, LuArrowRight } from "react-icons/lu";
 
 export default function SignalsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"daily" | "referral" | "history">("daily");
   const [loading, setLoading] = useState(true);
-  const [confirming, setConfirming] = useState<string | null>(null);
   const [signals, setSignals] = useState<Signal[]>([]);
   const [limits, setLimits] = useState<SignalLimits | null>(null);
   const [history, setHistory] = useState<SignalHistoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  
+  // Confirmation modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    signal: Signal | null;
+  }>({ isOpen: false, signal: null });
   
   // Trading status
   const [userProfile, setUserProfile] = useState<UserProfileResponse | null>(null);
@@ -73,30 +80,42 @@ export default function SignalsPage() {
   useEffect(() => {
     fetchTradingStatus();
     fetchSignals();
-    // Refresh every 30 seconds to update time remaining
-    const interval = setInterval(fetchSignals, 30000);
-    return () => clearInterval(interval);
+    // No auto-refresh - user can manually refresh if needed
   }, [fetchTradingStatus, fetchSignals]);
 
-  const handleConfirmSignal = async (signalId: string) => {
-    try {
-      setConfirming(signalId);
-      setError(null);
-      const res = await apiClient.confirmSignal(signalId);
+  // Open confirmation modal
+  const openConfirmModal = (signal: Signal) => {
+    setConfirmModal({ isOpen: true, signal });
+  };
 
-      if (res.success) {
-        setSuccessMessage(`Signal confirmed! Committed $${res.data?.committedAmount.toFixed(2)}. Results in 20 minutes.`);
-        // Refresh signals
-        await fetchSignals();
-        // Clear success message after 5 seconds
-        setTimeout(() => setSuccessMessage(null), 5000);
-      }
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to confirm signal";
-      setError(errorMessage);
-    } finally {
-      setConfirming(null);
-    }
+  // Close confirmation modal
+  const closeConfirmModal = () => {
+    setConfirmModal({ isOpen: false, signal: null });
+  };
+
+  // Navigate to trade page with signal data
+  const handleTradeNow = () => {
+    const signal = confirmModal.signal;
+    if (!signal) return;
+
+    closeConfirmModal();
+    
+    // Navigate to trade page with signal data as query params
+    const params = new URLSearchParams({
+      signalId: signal.id,
+      signalTitle: signal.title,
+      signalType: signal.type,
+      commitPercent: signal.commitPercent.toString(),
+      timeSlot: signal.timeSlot,
+    });
+    
+    router.push(`/dashboard/trade?${params.toString()}`);
+  };
+
+  // Calculate estimated commit amount for a signal
+  const getEstimatedCommit = (signal: Signal) => {
+    if (!wallet) return 0;
+    return (wallet.movementBalance * signal.commitPercent) / 100;
   };
 
   const formatTimeRemaining = (seconds: number) => {
@@ -411,7 +430,7 @@ export default function SignalsPage() {
                             <div>
                               <p className="text-white font-medium">{signal.title}</p>
                               <p className="text-zinc-400 text-sm">
-                                {signal.timeSlot === "MORNING" ? "9:00 AM GMT" : "7:00 PM GMT"} • {signal.commitPercent}% of balance
+                                {signal.timeSlot === "MORNING" ? "9:00 AM UTC" : "7:00 PM UTC"} • {signal.commitPercent}% of balance
                               </p>
                             </div>
                           </div>
@@ -423,16 +442,13 @@ export default function SignalsPage() {
                           </div>
                         </div>
                         <button
-                          onClick={() => handleConfirmSignal(signal.id)}
-                          disabled={!canTrade || confirming === signal.id || (limits !== null && limits.dailySignalsRemaining === 0)}
-                          className="btn-primary rounded-lg px-4 py-2 text-sm font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
+                          onClick={() => openConfirmModal(signal)}
+                          disabled={!canTrade || (limits !== null && limits.dailySignalsRemaining === 0)}
+                          className="btn-primary rounded-lg px-4 py-2 text-sm font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed flex items-center gap-2"
                           title={!canTrade ? restriction?.message : undefined}
                         >
-                          {confirming === signal.id ? (
-                            <LuRefreshCw className="w-5 h-5 animate-spin" />
-                          ) : (
-                            "Confirm Signal"
-                          )}
+                          Trade Now
+                          <LuArrowRight className="w-4 h-4" />
                         </button>
                       </div>
                     ))}
@@ -447,18 +463,18 @@ export default function SignalsPage() {
                 transition={{ delay: 0.1 }}
                 className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-6"
               >
-                <h3 className="text-lg font-semibold text-blue-300 mb-3">📅 Daily Schedule</h3>
+                <h3 className="text-lg font-semibold text-blue-300 mb-3">📅 Daily Schedule (UTC)</h3>
                 <div className="space-y-2 text-sm text-blue-400/80">
                   <div className="flex items-center justify-between">
-                    <span>9:00 AM GMT</span>
+                    <span>9:00 AM UTC</span>
                     <span>1 signal (after 15-min training)</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span>7:00 PM GMT</span>
+                    <span>7:00 PM UTC</span>
                     <span>2 signals (direct confirmation)</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span>3:00 PM GMT</span>
+                    <span>3:00 PM UTC</span>
                     <span>Referral signals (if available)</span>
                   </div>
                 </div>
@@ -490,7 +506,7 @@ export default function SignalsPage() {
                             <div>
                               <p className="text-white font-medium">{signal.title}</p>
                               <p className="text-zinc-400 text-sm">
-                                3:00 PM GMT • {signal.commitPercent}% of balance
+                                3:00 PM UTC • {signal.commitPercent}% of balance
                               </p>
                             </div>
                           </div>
@@ -502,16 +518,13 @@ export default function SignalsPage() {
                           </div>
                         </div>
                         <button
-                          onClick={() => handleConfirmSignal(signal.id)}
-                          disabled={!canTrade || confirming === signal.id || (limits !== null && limits.referralSignalsRemaining === 0)}
-                          className="btn-primary rounded-lg px-4 py-2 text-sm font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
+                          onClick={() => openConfirmModal(signal)}
+                          disabled={!canTrade || (limits !== null && limits.referralSignalsRemaining === 0)}
+                          className="btn-primary rounded-lg px-4 py-2 text-sm font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed flex items-center gap-2"
                           title={!canTrade ? restriction?.message : undefined}
                         >
-                          {confirming === signal.id ? (
-                            <LuRefreshCw className="w-5 h-5 animate-spin" />
-                          ) : (
-                            "Confirm Signal"
-                          )}
+                          Trade Now
+                          <LuArrowRight className="w-4 h-4" />
                         </button>
                       </div>
                     ))}
@@ -537,7 +550,7 @@ export default function SignalsPage() {
                     <span>15 signals (3/day for 5 days)</span>
                   </div>
                   <p className="text-xs text-cyan-500/60 mt-3">
-                    Signals are issued at 3 PM GMT and can be accumulated over time.
+                    Signals are issued at 3 PM UTC and can be accumulated over time.
                   </p>
                 </div>
               </motion.div>
@@ -631,10 +644,16 @@ export default function SignalsPage() {
                               item.outcome === "PROFIT" ? "text-green-400" : "text-red-400"
                             }`}
                           >
-                            {item.outcome === "PROFIT" ? "+" : ""}${item.resultAmount.toFixed(2)}
+                            {item.outcome === "PROFIT" ? "+" : ""}${(item.resultAmount ?? 0).toFixed(2)}
+                            {item.outcome === "PROFIT" && item.profitPercent != null && item.profitPercent > 0 && (
+                              <span className="text-green-300/80 text-sm font-normal ml-1">
+                                (+{item.profitPercent}%)
+                              </span>
+                            )}
                           </p>
                           <p className="text-zinc-500 text-xs">
                             Committed: ${item.committedAmount.toFixed(2)}
+                            {item.outcome === "LOSS" && " • Lost"}
                           </p>
                         </div>
                       </div>
@@ -647,6 +666,112 @@ export default function SignalsPage() {
         </div>
       </div>
       <DashboardFooter />
+
+      {/* Trade Now Confirmation Modal */}
+      <AnimatePresence>
+        {confirmModal.isOpen && confirmModal.signal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          >
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+              onClick={closeConfirmModal}
+            />
+
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative w-full max-w-md bg-gradient-to-br from-zinc-900 to-black border border-white/10 rounded-2xl p-6 shadow-2xl"
+            >
+              {/* Icon */}
+              <div className="flex justify-center mb-4">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-r from-blue-500/20 to-cyan-500/20 flex items-center justify-center">
+                  <LuTrendingUp className="w-8 h-8 text-cyan-400" />
+                </div>
+              </div>
+
+              {/* Title */}
+              <h3 className="text-xl font-bold text-white text-center mb-2">
+                Start Trading?
+              </h3>
+
+              {/* Description */}
+              <p className="text-zinc-400 text-center text-sm mb-6">
+                You&apos;re about to start a trade using this signal. Make sure you&apos;re ready!
+              </p>
+
+              {/* Signal Details */}
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-6 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-400 text-sm">Signal</span>
+                  <span className="text-white font-medium">{confirmModal.signal.title}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-400 text-sm">Type</span>
+                  <span className={`text-sm font-medium px-2 py-0.5 rounded ${
+                    confirmModal.signal.type === "DAILY" 
+                      ? "bg-blue-500/20 text-blue-400" 
+                      : "bg-cyan-500/20 text-cyan-400"
+                  }`}>
+                    {confirmModal.signal.type === "DAILY" ? "DAILY" : "REFERRAL"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-400 text-sm">Trading Time</span>
+                  <span className="text-white font-medium">
+                    {confirmModal.signal.timeSlot === "MORNING" ? "9:00 AM" : confirmModal.signal.timeSlot === "EVENING" ? "7:00 PM" : "3:00 PM"} UTC {confirmModal.signal.type}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-400 text-sm">Commit Amount</span>
+                  <span className="text-white">{confirmModal.signal.commitPercent}% of balance</span>
+                </div>
+                <div className="border-t border-white/10 pt-3 flex justify-between items-center">
+                  <span className="text-zinc-400 text-sm">Estimated Trade</span>
+                  <span className="text-green-400 font-bold text-lg">
+                    ${getEstimatedCommit(confirmModal.signal).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Info */}
+              <div className="flex items-start gap-3 bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 mb-6">
+                <span className="text-blue-400 text-lg">ℹ️</span>
+                <p className="text-blue-400/80 text-xs">
+                  You will be redirected to the trade page where you can confirm and execute your trade. Results will be available after ~30 seconds.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={closeConfirmModal}
+                  className="flex-1 py-3 px-4 rounded-xl bg-white/5 border border-white/10 text-zinc-400 font-medium hover:bg-white/10 hover:text-white transition-all duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleTradeNow}
+                  className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium hover:from-blue-600 hover:to-cyan-600 transition-all duration-200 shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2"
+                >
+                  Trade Now
+                  <LuArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

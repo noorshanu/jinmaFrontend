@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import DashboardNavbar from "@/components/DashboardNavbar";
-import { apiClient, WalletResponse } from "@/lib/api";
+import { apiClient, WalletResponse, WalletActivityItem } from "@/lib/api";
 import {
   LuWallet,
   LuRocket,
@@ -16,7 +16,8 @@ import {
   LuX,
   LuRefreshCw,
   LuLock,
-  LuLockOpen
+  LuLockOpen,
+  LuUserPlus
 } from "react-icons/lu";
 import DashboardFooter from "@/components/DashboardFooter";
 
@@ -35,6 +36,7 @@ interface Transfer {
 export default function WalletPage() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [transfers, setTransfers] = useState<Transfer[]>([]);
+  const [activities, setActivities] = useState<WalletActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [lockCountdown, setLockCountdown] = useState<string>("");
@@ -48,9 +50,10 @@ export default function WalletPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [walletRes, transfersRes] = await Promise.all([
+      const [walletRes, transfersRes, activityRes] = await Promise.all([
         apiClient.getWallet(),
-        apiClient.getTransferHistory(1, 5)
+        apiClient.getTransferHistory(1, 5),
+        apiClient.getWalletActivity(1, 15)
       ]);
 
       if (walletRes.success && walletRes.data) {
@@ -58,6 +61,9 @@ export default function WalletPage() {
       }
       if (transfersRes.success && transfersRes.data) {
         setTransfers(transfersRes.data.transfers);
+      }
+      if (activityRes.success && activityRes.data) {
+        setActivities(activityRes.data.activities);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load wallet");
@@ -377,7 +383,80 @@ export default function WalletPage() {
             </Link>
           </motion.div>
 
-          {/* Recent Transfers */}
+          {/* Transactions (deposits, transfers, admin credits e.g. "$200 sent by JinmaAdmin") */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.75 }}
+            className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"
+          >
+            <div className="flex items-center justify-between p-6 border-b border-white/10">
+              <h2 className="text-xl font-semibold text-white">Transactions</h2>
+            </div>
+
+            {loading ? (
+              <div className="p-12 text-center">
+                <LuRefreshCw size={40} className="text-zinc-500 mx-auto mb-4 animate-spin" />
+                <p className="text-zinc-400">Loading...</p>
+              </div>
+            ) : activities.length === 0 ? (
+              <div className="p-12 text-center">
+                <LuCircleDollarSign size={40} className="text-zinc-500 mx-auto mb-4" />
+                <p className="text-zinc-400">No transactions yet</p>
+                <p className="text-zinc-500 text-sm mt-2">Deposits, transfers, and admin credits will appear here</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-white/10">
+                {activities.map((a) => (
+                  <div
+                    key={a.id}
+                    className="p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          a.type === "admin_credit"
+                            ? "bg-emerald-500/20"
+                            : a.type === "deposit"
+                            ? "bg-blue-500/20"
+                            : "bg-purple-500/20"
+                        }`}
+                      >
+                        {a.type === "admin_credit" ? (
+                          <LuUserPlus size={20} className="text-emerald-400" />
+                        ) : a.type === "deposit" ? (
+                          <LuCircleDollarSign size={20} className="text-blue-400" />
+                        ) : a.direction === "main_to_movement" ? (
+                          <LuArrowRight size={20} className="text-purple-400" />
+                        ) : (
+                          <LuArrowLeft size={20} className="text-blue-400" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-white font-medium">{a.description}</p>
+                        <p className="text-zinc-500 text-sm">{formatDate(a.createdAt)}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p
+                        className={`font-semibold ${
+                          a.type === "admin_credit" || a.type === "deposit"
+                            ? "text-green-400"
+                            : "text-white"
+                        }`}
+                      >
+                        {a.type === "admin_credit" || a.type === "deposit"
+                          ? `+$${a.amount.toFixed(2)}`
+                          : `$${a.amount.toFixed(2)}`}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+
+          {/* Recent Transfers (compact) */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -389,10 +468,8 @@ export default function WalletPage() {
             </div>
 
             {transfers.length === 0 ? (
-              <div className="p-12 text-center">
-                <LuRefreshCw size={40} className="text-zinc-500 mx-auto mb-4" />
-                <p className="text-zinc-400">No transfers yet</p>
-                <p className="text-zinc-500 text-sm mt-2">Transfer funds between wallets to get started</p>
+              <div className="p-8 text-center">
+                <p className="text-zinc-500 text-sm">No transfers yet</p>
               </div>
             ) : (
               <div className="divide-y divide-white/10">

@@ -58,16 +58,36 @@ export default function DashboardPage() {
           setWallet(walletRes.data.wallet);
         }
 
-        // Fetch recent deposits for activity
-        const depositsRes = await apiClient.getDepositHistory(1, 3);
-        if (depositsRes.success && depositsRes.data) {
-          const activities: Activity[] = depositsRes.data.deposits.map((d) => ({
-            id: d.id,
-            type: d.status === "approved" ? "Deposit Approved" : d.status === "pending" ? "Deposit Pending" : "Deposit Rejected",
-            amount: d.status === "approved" ? `+$${(d.approvedAmount || d.requestedAmount).toFixed(2)}` : `$${d.requestedAmount.toFixed(2)}`,
-            time: formatTimeAgo(d.createdAt),
-            status: d.status === "approved" ? "deposit" : d.status === "pending" ? "transfer" : "withdrawal"
-          }));
+        // Fetch unified wallet activity (deposits, transfers, admin credits e.g. "$200 sent by JinmaAdmin")
+        const activityRes = await apiClient.getWalletActivity(1, 8);
+        if (activityRes.success && activityRes.data) {
+          const activities: Activity[] = activityRes.data.activities.slice(0, 6).map((a) => {
+            if (a.type === "admin_credit") {
+              return {
+                id: a.id,
+                type: a.description,
+                amount: `+$${a.amount.toFixed(2)}`,
+                time: formatTimeAgo(a.createdAt),
+                status: "deposit" as const
+              };
+            }
+            if (a.type === "deposit") {
+              return {
+                id: a.id,
+                type: "Deposit Approved",
+                amount: `+$${a.amount.toFixed(2)}`,
+                time: formatTimeAgo(a.createdAt),
+                status: "deposit" as const
+              };
+            }
+            return {
+              id: a.id,
+              type: a.description,
+              amount: `$${a.amount.toFixed(2)}`,
+              time: formatTimeAgo(a.createdAt),
+              status: "transfer" as const
+            };
+          });
           setRecentActivity(activities);
         }
       } catch (err) {
@@ -320,7 +340,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-white">Recent Activity</h2>
               <Link href="/dashboard/wallet" className="text-blue-400 text-sm hover:text-blue-300">
-                View All →
+                View transactions →
               </Link>
             </div>
             <div className="space-y-3">
