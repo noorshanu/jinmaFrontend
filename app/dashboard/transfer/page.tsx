@@ -399,7 +399,7 @@ export default function TransferPage() {
                     </li>
                     <li>You cannot transfer back to Main Account during the lock period</li>
                     <li>Your referrer will receive a bonus on your first transfer</li>
-                    <li>You will receive referral trading coupons</li>
+                    <li>You will receive referral trading signals</li>
                   </ul>
                 </div>
               )}

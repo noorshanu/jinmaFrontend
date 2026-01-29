@@ -12,7 +12,7 @@ type TradeResult = "PENDING" | "WIN" | "LOSS";
 
 function TradeContent() {
   const searchParams = useSearchParams();
-  const couponCode = searchParams.get("coupon") || "COUPON-A";
+  const couponCode = searchParams.get("signal") || "SIGNAL-A";
   const [timeRemaining, setTimeRemaining] = useState(30); // 30 seconds session
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [tradeResult, setTradeResult] = useState<TradeResult>("PENDING");
@@ -289,7 +289,7 @@ function TradeContent() {
           >
           {/* Coupon Info */}
           <div className="mb-6">
-            <p className="text-sm text-zinc-400 mb-2">Available Coupon</p>
+            <p className="text-sm text-zinc-400 mb-2">Available Signal</p>
             <div className="grid md:grid-cols-2 gap-4">
               <div className={`rounded-xl border p-4 ${
                 canTrade 
@@ -299,7 +299,7 @@ function TradeContent() {
                 <p className={`text-xs uppercase tracking-wide mb-1 ${
                   canTrade ? "text-blue-300" : "text-zinc-400"
                 }`}>
-                  Coupon
+                  Signal
                 </p>
                 <p className="text-lg font-semibold text-white mb-1">{couponCode}</p>
                 <p className={`text-sm mb-3 ${canTrade ? "text-blue-200" : "text-zinc-400"}`}>
@@ -316,7 +316,7 @@ function TradeContent() {
                   }`}
                   title={!canTrade ? restriction?.message : undefined}
                 >
-                  {isCheckingStatus ? "Checking..." : "Use Coupon"}
+                  {isCheckingStatus ? "Checking..." : "Use Signal"}
                 </button>
               </div>
             </div>
@@ -339,7 +339,7 @@ function TradeContent() {
                   </p>
                 </div>
                 <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                  <p className="text-zinc-400 text-sm mb-1">Coupon Percentage</p>
+                  <p className="text-zinc-400 text-sm mb-1">Signal Percentage</p>
                   <p className="text-2xl font-bold text-white">{couponPercentage}%</p>
                 </div>
               </div>
@@ -469,7 +469,7 @@ function TradeContent() {
                 <>
                   <p className="text-3xl font-bold text-green-400 mb-2">WIN</p>
                   <p className="text-sm text-green-300 mb-4">
-                    Congratulations! Your coupon trade finished in profit.
+                    Congratulations! Your signal trade finished in profit.
                   </p>
                 </>
               ) : (
@@ -495,7 +495,7 @@ function TradeContent() {
               </div>
               <div className="flex justify-between">
                 <span>Trade Type:</span>
-                <span className="font-semibold">Coupon ({couponCode})</span>
+                <span className="font-semibold">Signal ({couponCode})</span>
               </div>
             </div>
 
@@ -531,7 +531,7 @@ function TradeContent() {
           >
             <div className="mb-4 text-center">
               <p className="text-xs uppercase tracking-[0.2em] text-blue-400 mb-2">
-                Confirm Coupon
+                Confirm Signal
               </p>
               <h3 className="text-xl font-semibold text-white mb-1">
                 Use {couponCode} for this trade?
@@ -679,19 +679,19 @@ function TradeContent() {
                   <div className="flex justify-between">
                     <span>Trade Type:</span>
                     <span className="font-semibold">
-                      Long (Coupon {couponCode})
+                      Long (Signal {couponCode})
                     </span>
                   </div>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 mt-2">
-                  <button
+                  {/* <button
                     type="button"
                     onClick={handleCloseResultModal}
                     className="flex-1 rounded-xl bg-zinc-900/80 px-4 py-2.5 text-sm font-medium text-zinc-100 hover:bg-zinc-800 transition-colors border border-zinc-700/70"
                   >
                     Back to Trade
-                  </button>
+                  </button> */}
                   <Link
                     href="/dashboard"
                     className="flex-1 inline-flex items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-black hover:bg-emerald-400 transition-colors shadow-lg shadow-emerald-500/40"
