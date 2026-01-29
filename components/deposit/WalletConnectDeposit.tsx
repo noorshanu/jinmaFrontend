@@ -63,6 +63,10 @@ export default function WalletConnectDeposit({
   const { data: usdtBalance } = useBalance({ address, token: USDT_ADDRESS_BSC });
 
   const isOnBsc = chainId === bsc.id;
+  
+  // Check if user has USDT balance
+  const usdtBalanceNum = usdtBalance?.formatted ? parseFloat(usdtBalance.formatted) : 0;
+  const hasUsdtBalance = usdtBalanceNum > 0;
 
   const copyAddress = () => {
     navigator.clipboard.writeText(PLATFORM_ADDRESS);
@@ -98,6 +102,11 @@ export default function WalletConnectDeposit({
 
     const value = parseFloat(amount);
     if (!value || value <= 0) return onError("Enter a valid amount");
+    
+    // Check if user has enough USDT balance
+    if (value > usdtBalanceNum) {
+      return onError(`Insufficient USDT balance. You have ${usdtBalanceNum.toFixed(2)} USDT`);
+    }
 
     try {
       setVerifyMessage(null);
@@ -249,6 +258,16 @@ export default function WalletConnectDeposit({
         {/* Send Form - Compact */}
         {isConnected && (
           <div className="space-y-3">
+            {/* No USDT Balance Warning */}
+            {!hasUsdtBalance && (
+              <div className="flex items-center gap-2 p-3 bg-orange-500/10 border border-orange-500/20 rounded-xl">
+                <LuTriangleAlert size={16} className="text-orange-400 shrink-0" />
+                <p className="text-sm text-orange-400">
+                  No USDT balance. Please add USDT to your wallet first.
+                </p>
+              </div>
+            )}
+            
             <div className="flex gap-2">
               <div className="flex-1 relative">
                 <input
@@ -258,7 +277,8 @@ export default function WalletConnectDeposit({
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0.00"
-                  className="w-full h-11 rounded-xl border border-white/10 bg-black/40 pl-4 pr-16 text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20"
+                  disabled={!hasUsdtBalance}
+                  className="w-full h-11 rounded-xl border border-white/10 bg-black/40 pl-4 pr-16 text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
                   USDT
@@ -267,8 +287,9 @@ export default function WalletConnectDeposit({
               <button
                 type="button"
                 onClick={handleSendAndVerify}
-                disabled={isSending || isWaitingReceipt || !amount.trim() || !isOnBsc}
+                disabled={isSending || isWaitingReceipt || !amount.trim() || !isOnBsc || !hasUsdtBalance}
                 className="h-11 px-5 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 text-black text-sm font-semibold hover:from-yellow-400 hover:to-orange-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all"
+                title={!hasUsdtBalance ? "Add USDT to your wallet first" : undefined}
               >
                 {(isSending || isWaitingReceipt) ? (
                   <LuLoader size={16} className="animate-spin" />
