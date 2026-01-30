@@ -1,0 +1,63 @@
+{
+  "common": {
+    "home": "Home",
+    "login": "Login",
+    "register": "Register",
+    "logout": "Logout",
+    "dashboard": "Dashboard",
+    "signals": "Signals",
+    "trade": "Trade",
+    "referrals": "Referrals",
+    "grades": "Grades",
+    "settings": "Settings",
+    "wallet": "Wallet",
+    "deposit": "Deposit",
+    "withdraw": "Withdraw",
+    "transfer": "Transfer",
+    "user": "User",
+    "language": "Language"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "signals": "Signals",
+    "trade": "Trade",
+    "referrals": "Referrals",
+    "grades": "Grades",
+    "settings": "Settings"
+  },
+  "auth": {
+    "login": "Login",
+    "register": "Register",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot Password?",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?"
+  },
+  "dashboard": {
+    "welcome": "Dashboard",
+    "balance": "Balance",
+    "recentActivity": "Recent Activity",
+    "signalsToUse": "Signals to use",
+    "tradeHistory": "Trade history"
+  },
+  "signals": {
+    "title": "Trading Signals",
+    "daily": "Daily",
+    "referral": "Referral",
+    "welcome": "Welcome",
+    "welcomeFromAdmin": "Welcome signal (from admin)",
+    "tradeNow": "Trade Now",
+    "history": "History"
+  },
+  "trade": {
+    "title": "Trade",
+    "use": "Use",
+    "confirmTrade": "Confirm trade",
+    "tradeInProgress": "Trade in progress",
+    "resultOnTheWay": "Result on the way...",
+    "tradeCompleted": "Trade completed",
+    "win": "WIN!",
+    "loss": "LOSS"
+  }
+}

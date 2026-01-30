@@ -29,7 +29,7 @@ type TradePhase = "READY" | "CONFIRMED" | "WAITING" | "SETTLED";
 interface SignalData {
   signalId: string;
   signalTitle: string;
-  signalType: "DAILY" | "REFERRAL";
+  signalType: "DAILY" | "REFERRAL" | "WELCOME";
   commitPercent: number;
   timeSlot: string;
 }
@@ -41,16 +41,17 @@ function TradeContent() {
   const signalDataFromUrl: SignalData | null = useMemo(() => {
     const signalId = searchParams.get("signalId");
     const signalTitle = searchParams.get("signalTitle");
-    const signalType = searchParams.get("signalType") as "DAILY" | "REFERRAL";
+    const signalType = searchParams.get("signalType") as "DAILY" | "REFERRAL" | "WELCOME" | null;
     const commitPercent = searchParams.get("commitPercent");
     const timeSlot = searchParams.get("timeSlot") || "";
-    if (!signalId || !signalTitle || !signalType || !commitPercent) return null;
+    if (!signalId || !signalTitle || !commitPercent) return null;
+    const type = signalType === "WELCOME" || signalType === "REFERRAL" || signalType === "DAILY" ? signalType : "DAILY";
     return {
       signalId,
       signalTitle,
-      signalType,
+      signalType: type,
       commitPercent: parseFloat(commitPercent),
-      timeSlot,
+      timeSlot: timeSlot || (type === "WELCOME" ? "WELCOME" : ""),
     };
   }, [searchParams]);
 
@@ -123,9 +124,18 @@ function TradeContent() {
       case "AFTERNOON":
       case "REFERRAL":
         return "3:00 PM UTC";
+      case "WELCOME":
+      case "CUSTOM":
+        return "Welcome signal";
       default:
         return getCurrentUTCTime();
     }
+  };
+
+  const getSignalTypeLabel = (type: string) => {
+    if (type === "WELCOME") return "Welcome signal (from admin)";
+    if (type === "REFERRAL") return "Referral";
+    return "Daily";
   };
 
   const formatTimeRemaining = (seconds: number) => {
@@ -262,9 +272,9 @@ function TradeContent() {
     return () => clearInterval(timer);
   }, [expiresAt, phase]);
 
-  // Poll for result
+  // Poll for result (interval kept slow to avoid 429; backend settles on first poll after expiry)
   const pollForResult = useCallback(async (): Promise<{ done: boolean; isRateLimited?: boolean }> => {
-    if (!usageId || pollingResult) return { done: false };
+    if (!usageId) return { done: false };
     setPollingResult(true);
     try {
       const res = await apiClient.getSignalUsage(usageId);
@@ -280,19 +290,26 @@ function TradeContent() {
       setPollingResult(false);
     }
     return { done: false };
-  }, [usageId, pollingResult]);
+  }, [usageId]);
 
   useEffect(() => {
     if (phase !== "SETTLED" || !usageId) return;
+    let cancelled = false;
     let attempts = 0;
+    const POLL_INTERVAL_MS = 5000;   // 5 sec normal
+    const POLL_INTERVAL_429_MS = 15000; // 15 sec after rate limit
     const poll = async () => {
+      if (cancelled || attempts >= 40) return; // ~3 min max at 5s
       const { done, isRateLimited } = await pollForResult();
-      if (done || attempts >= 20) return;
+      if (cancelled) return;
+      if (done) return;
       attempts++;
-      setTimeout(poll, isRateLimited ? 8000 : 3000);
+      const delay = isRateLimited ? POLL_INTERVAL_429_MS : POLL_INTERVAL_MS;
+      setTimeout(poll, delay);
     };
     poll();
-  }, [phase, usageId, pollForResult]);
+    return () => { cancelled = true; };
+  }, [phase, usageId]); // intentionally omit pollForResult to avoid restarting loop
 
   const isTradingActive = userProfile?.isTradingActive ?? false;
   const hasMinBalance = movementBalance >= 250;
@@ -405,21 +422,44 @@ function TradeContent() {
             >
               <div className="text-center">
                 <div className="mb-6">
-                  <span className="text-5xl">{timeRemaining > 0 ? "⏳" : pollingResult ? "🔄" : "✅"}</span>
+                  {timeRemaining > 0 ? (
+                    <span className="text-5xl">⏳</span>
+                  ) : !tradeResult ? (
+                    <motion.span
+                      className="inline-block text-5xl"
+                      animate={{ scale: [1, 1.15, 1], opacity: [0.9, 1, 0.9] }}
+                      transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                      aria-hidden
+                    >
+                      ₿
+                    </motion.span>
+                  ) : (
+                    <span className="text-5xl">✅</span>
+                  )}
                   <h2 className="text-xl font-bold text-white mt-4">
-                    {timeRemaining > 0 ? "Trade in progress" : pollingResult ? "Calculating result..." : "Trade completed"}
+                    {timeRemaining > 0
+                      ? "Trade in progress"
+                      : !tradeResult
+                        ? "Result on the way..."
+                        : "Trade completed"}
                   </h2>
                 </div>
-                <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 mb-2">
-                  {formatTime(timeRemaining)}
-                </div>
+                {timeRemaining > 0 ? (
+                  <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 mb-2">
+                    {formatTime(timeRemaining)}
+                  </div>
+                ) : !tradeResult ? (
+                  <p className="text-amber-400/90 text-sm mb-2">Settling your trade</p>
+                ) : null}
                 <p className="text-zinc-400 text-sm mb-6">
                   {signalData.signalTitle} • ${committedAmount.toFixed(2)} locked
                 </p>
                 <div className="w-full max-w-md mx-auto bg-white/5 rounded-full h-2 overflow-hidden">
                   <motion.div
                     className="bg-gradient-to-r from-blue-500 to-cyan-500 h-2 rounded-full"
-                    animate={{ width: `${timeRemaining <= 0 ? 100 : Math.max(0, 100 - (timeRemaining / 300) * 100)}%` }}
+                    animate={{
+                      width: `${timeRemaining <= 0 ? 100 : Math.max(0, 100 - (timeRemaining / 900) * 100)}%`,
+                    }}
                     transition={{ duration: 0.5 }}
                   />
                 </div>
@@ -459,13 +499,14 @@ function TradeContent() {
                     {availableSignals.map((s) => (
                       <div
                         key={s.id}
-                        className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10"
+                        className={`flex items-center justify-between p-4 rounded-xl border ${
+                          s.type === "WELCOME" ? "bg-violet-500/5 border-violet-500/20" : "bg-white/5 border-white/10"
+                        }`}
                       >
                         <div>
                           <p className="font-medium text-white">{s.title}</p>
                           <p className="text-sm text-zinc-400">
-                            {s.timeSlot === "MORNING" ? "9:00 AM" : s.timeSlot === "EVENING" ? "7:00 PM" : "3:00 PM"} UTC •{" "}
-                            {s.commitPercent}% of balance • {formatTimeRemaining(s.timeRemaining)} left
+                            {getSignalTypeLabel(s.type)} • {s.commitPercent}% of balance • {formatTimeRemaining(s.timeRemaining)} left
                           </p>
                         </div>
                         <button
@@ -474,7 +515,7 @@ function TradeContent() {
                           className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-sm font-medium text-white hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed"
                           title={!canTrade ? restriction?.message : undefined}
                         >
-                          Use signal <LuArrowRight className="w-4 h-4" />
+                          Use <LuArrowRight className="w-4 h-4" />
                         </button>
                       </div>
                     ))}
@@ -549,7 +590,7 @@ function TradeContent() {
                           >
                             {item.outcome === "PROFIT" ? "+" : ""}${(item.resultAmount ?? 0).toFixed(2)}
                             {item.outcome === "PROFIT" && item.profitPercent != null && item.profitPercent > 0 && (
-                              <span className="text-green-300/80 text-xs ml-1">(+{item.profitPercent}%)</span>
+                              <span className="text-green-300/80 text-xs ml-1">(+{Number(item.profitPercent).toFixed(2)}%)</span>
                             )}
                           </p>
                           <p className="text-zinc-500 text-xs">Committed: ${item.committedAmount.toFixed(2)}</p>
@@ -565,12 +606,16 @@ function TradeContent() {
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mb-6 bg-blue-500/10 border border-blue-500/20 rounded-2xl p-6"
+                  className={`mb-6 rounded-2xl p-6 ${
+                    signalDataFromUrl.signalType === "WELCOME"
+                      ? "bg-violet-500/10 border border-violet-500/20"
+                      : "bg-blue-500/10 border border-blue-500/20"
+                  }`}
                 >
-                  <p className="text-blue-300 text-sm mb-2">You selected from Signals page</p>
+                  <p className="text-zinc-300 text-sm mb-2">You selected from Signals page</p>
                   <p className="text-white font-medium">{signalDataFromUrl.signalTitle}</p>
                   <p className="text-zinc-400 text-sm mt-1">
-                    {getTradingTime(signalDataFromUrl.timeSlot)} • {signalDataFromUrl.commitPercent}% of balance
+                    {getSignalTypeLabel(signalDataFromUrl.signalType)} • {signalDataFromUrl.commitPercent}% of balance
                   </p>
                   <button
                     onClick={() => {
@@ -580,7 +625,7 @@ function TradeContent() {
                     disabled={!canTrade}
                     className="mt-4 flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50"
                   >
-                    Use this signal <LuArrowRight className="w-4 h-4" />
+                    Use <LuArrowRight className="w-4 h-4" />
                   </button>
                 </motion.div>
               )}
@@ -620,7 +665,7 @@ function TradeContent() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-zinc-400">Type</span>
-                  <span className="text-white">{selectedSignalForConfirm.type}</span>
+                  <span className="text-white">{getSignalTypeLabel(selectedSignalForConfirm.type)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-zinc-400">Commit</span>
@@ -681,8 +726,9 @@ function TradeContent() {
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              initial={{ opacity: 0, scale: 0.6, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 24 }}
               exit={{ opacity: 0, scale: 0.9 }}
               className={`w-full max-w-lg rounded-3xl border shadow-2xl p-8 ${
                 tradeResult.outcome === "PROFIT"
@@ -701,7 +747,7 @@ function TradeContent() {
                 </p>
                 <p className="text-lg text-zinc-300 mt-2">
                   {tradeResult.outcome === "PROFIT"
-                    ? `+${tradeResult.profitPercent}% profit`
+                    ? `+${Number(tradeResult.profitPercent).toFixed(2)}% profit`
                     : "-100% of committed amount"}
                 </p>
                 <p className={`text-2xl font-bold mt-2 ${tradeResult.outcome === "PROFIT" ? "text-emerald-400" : "text-red-400"}`}>

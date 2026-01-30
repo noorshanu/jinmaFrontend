@@ -11,7 +11,7 @@ import { LuRefreshCw, LuClock, LuTrendingUp, LuTrendingDown, LuArrowRight } from
 
 export default function SignalsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"daily" | "referral" | "history">("daily");
+  const [activeTab, setActiveTab] = useState<"daily" | "referral" | "welcome" | "history">("daily");
   const [loading, setLoading] = useState(true);
   const [signals, setSignals] = useState<Signal[]>([]);
   const [limits, setLimits] = useState<SignalLimits | null>(null);
@@ -83,6 +83,13 @@ export default function SignalsPage() {
     // No auto-refresh - user can manually refresh if needed
   }, [fetchTradingStatus, fetchSignals]);
 
+  // If user has no referral allowance and is on referral tab, switch to daily (tab is hidden when ineligible)
+  useEffect(() => {
+    if (limits !== null && limits.referralSignalsRemaining === 0 && activeTab === "referral") {
+      setActiveTab("daily");
+    }
+  }, [limits, activeTab]);
+
   // Open confirmation modal
   const openConfirmModal = (signal: Signal) => {
     setConfirmModal({ isOpen: true, signal });
@@ -132,6 +139,7 @@ export default function SignalsPage() {
   // Filter signals by type
   const dailySignals = signals.filter((s) => s.type === "DAILY");
   const referralSignals = signals.filter((s) => s.type === "REFERRAL");
+  const welcomeSignals = signals.filter((s) => s.type === "WELCOME");
 
   // Filter history
   const pendingHistory = history.filter((h) => h.outcome === "PENDING");
@@ -384,6 +392,7 @@ export default function SignalsPage() {
             >
               Daily ({dailySignals.length})
             </button>
+            {limits !== null && limits.referralSignalsRemaining > 0 && (
             <button
               onClick={() => setActiveTab("referral")}
               className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${
@@ -393,6 +402,17 @@ export default function SignalsPage() {
               }`}
             >
               Referral ({referralSignals.length})
+            </button>
+            )}
+            <button
+              onClick={() => setActiveTab("welcome")}
+              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${
+                activeTab === "welcome"
+                  ? "bg-violet-500/20 text-violet-400 shadow-lg shadow-violet-500/20"
+                  : "text-zinc-400 hover:text-white"
+              }`}
+            >
+              Welcome ({welcomeSignals.length})
             </button>
             <button
               onClick={() => setActiveTab("history")}
@@ -557,6 +577,59 @@ export default function SignalsPage() {
             </div>
           )}
 
+          {/* Welcome Signals Tab (from admin) */}
+          {activeTab === "welcome" && (
+            <div className="space-y-6">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl"
+              >
+                <h2 className="text-xl font-semibold text-white mb-1">Welcome signals</h2>
+                <p className="text-violet-400/90 text-sm mb-4">Sent by admin — use these to trade</p>
+                {welcomeSignals.length === 0 ? (
+                  <p className="text-zinc-400 text-center py-8">No welcome signals from admin right now</p>
+                ) : (
+                  <div className="space-y-3">
+                    {welcomeSignals.map((signal) => (
+                      <div
+                        key={signal.id}
+                        className="flex items-center justify-between p-4 bg-violet-500/5 rounded-xl border border-violet-500/20"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="text-2xl">🎁</span>
+                            <div>
+                              <p className="text-white font-medium">{signal.title}</p>
+                              <p className="text-violet-400/90 text-sm">
+                                Welcome signal (from admin) • {signal.commitPercent}% of balance
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className="text-xs text-yellow-400 bg-yellow-500/20 px-2 py-1 rounded flex items-center gap-1">
+                              <LuClock className="w-3 h-3" />
+                              {formatTimeRemaining(signal.timeRemaining)} remaining
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => openConfirmModal(signal)}
+                          disabled={!canTrade}
+                          className="rounded-lg px-4 py-2 text-sm font-medium bg-violet-500 text-white hover:bg-violet-600 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed flex items-center gap-2"
+                          title={!canTrade ? restriction?.message : undefined}
+                        >
+                          Trade Now
+                          <LuArrowRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            </div>
+          )}
+
           {/* History Tab */}
           {activeTab === "history" && (
             <div className="space-y-6">
@@ -647,7 +720,7 @@ export default function SignalsPage() {
                             {item.outcome === "PROFIT" ? "+" : ""}${(item.resultAmount ?? 0).toFixed(2)}
                             {item.outcome === "PROFIT" && item.profitPercent != null && item.profitPercent > 0 && (
                               <span className="text-green-300/80 text-sm font-normal ml-1">
-                                (+{item.profitPercent}%)
+                                (+{Number(item.profitPercent).toFixed(2)}%)
                               </span>
                             )}
                           </p>

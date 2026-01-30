@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import { 
   LuLayoutDashboard, 
   LuTicket, 
@@ -15,14 +16,28 @@ import {
   LuLogOut,
   LuChevronDown
 } from "react-icons/lu";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 const navLinks = [
-  { href: "/dashboard", label: "Dashboard", icon: LuLayoutDashboard },
-  { href: "/dashboard/signals", label: "Signals", icon: LuTicket },
-  { href: "/dashboard/trade", label: "Trade", icon: LuTrendingUp },
-  { href: "/dashboard/referrals", label: "Referrals", icon: LuUsers },
-  { href: "/dashboard/grades", label: "Grades", icon: LuStar },
+  { href: "/dashboard", labelKey: "nav.dashboard", icon: LuLayoutDashboard },
+  { href: "/dashboard/signals", labelKey: "nav.signals", icon: LuTicket },
+  { href: "/dashboard/trade", labelKey: "nav.trade", icon: LuTrendingUp },
+  { href: "/dashboard/referrals", labelKey: "nav.referrals", icon: LuUsers },
+  { href: "/dashboard/grades", labelKey: "nav.grades", icon: LuStar },
 ];
+
+// English fallbacks for SSR/hydration (server and client must match until mounted)
+const navFallbacks: Record<string, string> = {
+  "nav.dashboard": "Dashboard",
+  "nav.signals": "Signals",
+  "nav.trade": "Trade",
+  "nav.referrals": "Referrals",
+  "nav.grades": "Grades",
+  "nav.settings": "Settings",
+  "common.settings": "Settings",
+  "common.wallet": "Wallet",
+  "common.logout": "Logout",
+};
 
 // Read user from localStorage (only call on client)
 function readUserFromStorage() {
@@ -47,6 +62,8 @@ function readUserFromStorage() {
 }
 
 export default function DashboardNavbar() {
+  const { t } = useTranslation();
+  const [mounted, setMounted] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [profileDropdown, setProfileDropdown] = useState(false);
   // Initialize with default values for SSR, update after mount
@@ -54,6 +71,10 @@ export default function DashboardNavbar() {
   const pathname = usePathname();
   const router = useRouter();
   const didLoad = useRef(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Load user data from localStorage after mount (client-side only)
   useEffect(() => {
@@ -82,6 +103,12 @@ export default function DashboardNavbar() {
   const initials = userState.loaded 
     ? (userState.name.split(" ").map(n => n[0]).join("") || "U")
     : "U";
+
+  // Use fallback when not mounted or on server so server/client HTML match (avoid hydration error)
+  const navLabel = (key: string) =>
+    typeof window === "undefined" || !mounted
+      ? (navFallbacks[key] ?? key)
+      : t(key);
 
   return (
     <nav
@@ -116,10 +143,11 @@ export default function DashboardNavbar() {
                   }`}
                 >
                   <Icon size={18} />
-                  <span>{link.label}</span>
+                  <span>{navLabel(link.labelKey)}</span>
                 </Link>
               );
             })}
+            <LanguageSwitcher />
           </div>
 
           {/* Profile Section */}
@@ -171,7 +199,7 @@ export default function DashboardNavbar() {
                         onClick={() => setProfileDropdown(false)}
                       >
                         <LuSettings size={16} />
-                        <span>Settings</span>
+                        <span>{mounted ? t("common.settings") : navFallbacks["common.settings"]}</span>
                       </Link>
                       <Link
                         href="/dashboard/wallet"
@@ -179,7 +207,7 @@ export default function DashboardNavbar() {
                         onClick={() => setProfileDropdown(false)}
                       >
                         <LuTrendingUp size={16} />
-                        <span>Wallet</span>
+                        <span>{navLabel("common.wallet")}</span>
                       </Link>
                       <button
                         onClick={() => {
@@ -194,7 +222,7 @@ export default function DashboardNavbar() {
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all duration-300 text-sm"
                       >
                         <LuLogOut size={16} />
-                        <span>Logout</span>
+                        <span>{navLabel("common.logout")}</span>
                       </button>
                     </div>
                   </motion.div>
@@ -224,10 +252,13 @@ export default function DashboardNavbar() {
                 }`}
               >
                 <Icon size={20} />
-                <span>{link.label}</span>
+                <span>{navLabel(link.labelKey)}</span>
               </Link>
             );
           })}
+          <div className="flex justify-center py-2">
+            <LanguageSwitcher />
+          </div>
         </div>
       </div>
     </nav>

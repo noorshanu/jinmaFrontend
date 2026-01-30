@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Web3Provider from "@/components/web3/Web3Provider";
+import I18nProvider from "@/components/I18nProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,11 +14,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
-        <Web3Provider>
-          {children}
-        </Web3Provider>
+        <I18nProvider>
+          <Web3Provider>
+            {children}
+          </Web3Provider>
+        </I18nProvider>
       </body>
     </html>
   );

@@ -1,0 +1,63 @@
+{
+  "common": {
+    "home": "الرئيسية",
+    "login": "تسجيل الدخول",
+    "register": "التسجيل",
+    "logout": "تسجيل الخروج",
+    "dashboard": "لوحة التحكم",
+    "signals": "الإشارات",
+    "trade": "التداول",
+    "referrals": "الإحالات",
+    "grades": "المستويات",
+    "settings": "الإعدادات",
+    "wallet": "المحفظة",
+    "deposit": "إيداع",
+    "withdraw": "سحب",
+    "transfer": "تحويل",
+    "user": "المستخدم",
+    "language": "اللغة"
+  },
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "signals": "الإشارات",
+    "trade": "التداول",
+    "referrals": "الإحالات",
+    "grades": "المستويات",
+    "settings": "الإعدادات"
+  },
+  "auth": {
+    "login": "تسجيل الدخول",
+    "register": "التسجيل",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "forgotPassword": "نسيت كلمة المرور؟",
+    "noAccount": "ليس لديك حساب؟",
+    "hasAccount": "لديك حساب بالفعل؟"
+  },
+  "dashboard": {
+    "welcome": "لوحة التحكم",
+    "balance": "الرصيد",
+    "recentActivity": "النشاط الأخير",
+    "signalsToUse": "الإشارات المتاحة",
+    "tradeHistory": "سجل التداول"
+  },
+  "signals": {
+    "title": "إشارات التداول",
+    "daily": "يومي",
+    "referral": "إحالة",
+    "welcome": "ترحيب",
+    "welcomeFromAdmin": "إشارة ترحيب (من الإدارة)",
+    "tradeNow": "تداول الآن",
+    "history": "السجل"
+  },
+  "trade": {
+    "title": "التداول",
+    "use": "استخدام",
+    "confirmTrade": "تأكيد التداول",
+    "tradeInProgress": "جاري التداول",
+    "resultOnTheWay": "النتيجة قادمة...",
+    "tradeCompleted": "اكتمل التداول",
+    "win": "فوز!",
+    "loss": "خسارة"
+  }
+}

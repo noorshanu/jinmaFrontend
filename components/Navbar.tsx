@@ -3,14 +3,16 @@
 import { useEffect, useState } from "react";
 import { LuMenu, LuX } from "react-icons/lu";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import { apiClient } from "@/lib/api";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 const links = [
-  { id: "Home", label: "Home" },
-
+  { id: "Home", labelKey: "common.home" },
 ];
 
 export default function Navbar() {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState("Home");
   const [scrolled, setScrolled] = useState(false);
@@ -95,7 +97,7 @@ export default function Navbar() {
                   rel="noopener noreferrer"
                   className="text-zinc-300 hover:text-white transition-colors duration-300 relative group"
                 >
-                  {l.label}
+                  {t("common.home")}
                   <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-400 to-cyan-300 transition-all duration-300 group-hover:w-full"></span>
                 </a>
               ) : (
@@ -106,13 +108,15 @@ export default function Navbar() {
                     active === l.id ? "text-white" : "text-zinc-300 hover:text-white"
                   }`}
                 >
-                  {l.label}
+                  {t(l.labelKey)}
                   <span className={`absolute -bottom-1 left-0 h-0.5 bg-gradient-to-r from-blue-400 to-cyan-300 transition-all duration-300 ${
                     active === l.id ? "w-full" : "w-0 group-hover:w-full"
                   }`}></span>
                 </button>
               )
             )}
+
+            <LanguageSwitcher />
 
             {isLoggedIn ? (
               <div className="flex items-center gap-4">
@@ -133,7 +137,7 @@ export default function Navbar() {
                   onClick={() => router.push("/dashboard")} 
                   className="btn-primary rounded-xl px-4 py-2 md:px-6 md:py-3 font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-blue-500/25"
                 >
-                  Dashboard
+                  {t("common.dashboard")}
                 </button>
               </div>
             ) : (
@@ -141,7 +145,7 @@ export default function Navbar() {
                 onClick={() => router.push("/login")} 
                 className="btn-primary rounded-xl px-4 py-2 md:px-6 md:py-3 font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-blue-500/25"
               >
-                Login
+                {t("common.login")}
               </button>
             )}
           </nav>
@@ -167,7 +171,7 @@ export default function Navbar() {
                   rel="noopener noreferrer"
                   className="text-zinc-300 hover:text-white transition-all duration-300 py-2 px-3 rounded-lg hover:bg-white/5 flex items-center justify-between group"
                 >
-                  <span>{l.label}</span>
+                  <span>{t("common.home")}</span>
                   <div className="w-2 h-2 bg-blue-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 </a>
               ) : (
@@ -178,7 +182,7 @@ export default function Navbar() {
                     active === l.id ? "text-white bg-white/5" : ""
                   }`}
                 >
-                  <span>{l.label}</span>
+                  <span>{t(l.labelKey)}</span>
                   <div className={`w-2 h-2 bg-blue-400 rounded-full transition-all duration-300 ${
                     active === l.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                   }`}></div>
@@ -208,7 +212,7 @@ export default function Navbar() {
                     }} 
                     className="btn-primary rounded-xl px-4 py-3 font-medium w-full transition-all duration-300 hover:scale-105"
                   >
-                    Dashboard
+                    {t("common.dashboard")}
                   </button>
                 </>
               ) : (
@@ -219,7 +223,7 @@ export default function Navbar() {
                   }} 
                   className="btn-primary rounded-xl px-4 py-3 font-medium w-full transition-all duration-300 hover:scale-105"
                 >
-                  Login
+                  {t("common.login")}
                 </button>
               )}
             </div>

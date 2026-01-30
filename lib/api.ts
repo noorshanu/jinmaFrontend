@@ -1,4 +1,4 @@
-const API_BASE_URL ='https://api.jinma.tech/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -220,8 +220,8 @@ export interface WithdrawalHistoryResponse {
 // Signal types
 export interface Signal {
   id: string;
-  type: 'DAILY' | 'REFERRAL';
-  timeSlot: 'MORNING' | 'EVENING' | 'REFERRAL';
+  type: 'DAILY' | 'REFERRAL' | 'WELCOME';
+  timeSlot: 'MORNING' | 'EVENING' | 'REFERRAL' | 'WELCOME' | 'CUSTOM';
   title: string;
   description?: string;
   commitPercent: number;
@@ -249,8 +249,8 @@ export interface SignalHistoryItem {
   signal: {
     id: string;
     title: string;
-    type: 'DAILY' | 'REFERRAL';
-    timeSlot: 'MORNING' | 'EVENING' | 'REFERRAL';
+    type: 'DAILY' | 'REFERRAL' | 'WELCOME';
+    timeSlot: 'MORNING' | 'EVENING' | 'REFERRAL' | 'WELCOME' | 'CUSTOM';
   } | null;
   committedAmount: number;
   outcome: 'PENDING' | 'PROFIT' | 'LOSS' | 'CANCELLED';

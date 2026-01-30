@@ -1,0 +1,63 @@
+{
+  "common": {
+    "home": "Inicio",
+    "login": "Iniciar sesión",
+    "register": "Registrarse",
+    "logout": "Cerrar sesión",
+    "dashboard": "Panel",
+    "signals": "Señales",
+    "trade": "Operar",
+    "referrals": "Referidos",
+    "grades": "Niveles",
+    "settings": "Ajustes",
+    "wallet": "Cartera",
+    "deposit": "Depositar",
+    "withdraw": "Retirar",
+    "transfer": "Transferir",
+    "user": "Usuario",
+    "language": "Idioma"
+  },
+  "nav": {
+    "dashboard": "Panel",
+    "signals": "Señales",
+    "trade": "Operar",
+    "referrals": "Referidos",
+    "grades": "Niveles",
+    "settings": "Ajustes"
+  },
+  "auth": {
+    "login": "Iniciar sesión",
+    "register": "Registrarse",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "noAccount": "¿No tienes cuenta?",
+    "hasAccount": "¿Ya tienes cuenta?"
+  },
+  "dashboard": {
+    "welcome": "Panel",
+    "balance": "Saldo",
+    "recentActivity": "Actividad reciente",
+    "signalsToUse": "Señales disponibles",
+    "tradeHistory": "Historial de operaciones"
+  },
+  "signals": {
+    "title": "Señales de trading",
+    "daily": "Diario",
+    "referral": "Referido",
+    "welcome": "Bienvenida",
+    "welcomeFromAdmin": "Señal de bienvenida (del admin)",
+    "tradeNow": "Operar ahora",
+    "history": "Historial"
+  },
+  "trade": {
+    "title": "Operar",
+    "use": "Usar",
+    "confirmTrade": "Confirmar operación",
+    "tradeInProgress": "Operación en curso",
+    "resultOnTheWay": "Resultado en camino...",
+    "tradeCompleted": "Operación completada",
+    "win": "¡GANASTE!",
+    "loss": "PÉRDIDA"
+  }
+}
