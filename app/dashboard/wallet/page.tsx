@@ -53,7 +53,7 @@ export default function WalletPage() {
       const [walletRes, transfersRes, activityRes] = await Promise.all([
         apiClient.getWallet(),
         apiClient.getTransferHistory(1, 5),
-        apiClient.getWalletActivity(1, 15)
+        apiClient.getWalletActivity(1, 15),
       ]);
 
       if (walletRes.success && walletRes.data) {

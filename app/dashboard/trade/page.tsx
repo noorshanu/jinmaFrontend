@@ -15,10 +15,9 @@ import {
   SignalHistoryItem,
 } from "@/lib/api";
 import {
-  LuClock,
   LuTrendingUp,
   LuTrendingDown,
-  LuTriangleAlert,
+
   LuRefreshCw,
   LuArrowRight,
   LuTicket,
@@ -329,7 +328,7 @@ function TradeContent() {
   const restriction = !hasMinBalance
     ? { type: "balance" as const, title: "Insufficient Balance", message: "Movement balance below $250. Add balance to trade." }
     : !isTradingActive
-      ? { type: "inactive" as const, title: "Trading Deactivated", message: "Contact admin to reactivate trading." }
+      ? { type: "inactive" as const, title: "Trading account not activated", message: "Please deposit and contact admin to activate your trading account to unlock all benefits." }
       : null;
 
   const handleConfirmTrade = async () => {

@@ -180,7 +180,7 @@ export default function SignalsPage() {
     if (!isTradingActive) {
       return {
         type: "inactive" as const,
-        message: "Your trading account is deactivated. Please contact admin to reactivate your trading status.",
+        message: "Trading account not activated. Please deposit and contact admin to activate your trading account to unlock all benefits.",
       };
     }
     return null;
