@@ -3,14 +3,14 @@
 import "@rainbow-me/rainbowkit/styles.css";
 import { getDefaultConfig, RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
 import { WagmiProvider } from "wagmi";
-import { bsc } from "wagmi/chains";
+import { bsc, mainnet } from "wagmi/chains";
 import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
 
-// Configure wagmi with BSC only (Tron is handled separately as it's not EVM-compatible)
+// BSC (BEP20) and Ethereum (ERC20) for WalletConnect deposits
 const config = getDefaultConfig({
   appName: "MarketProject",
   projectId: "2f4da7b40d4f371ee01ffcee4851dff2",
-  chains: [bsc],
+  chains: [bsc, mainnet],
   ssr: true,
 });
 

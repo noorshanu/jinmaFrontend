@@ -11,7 +11,7 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { bsc } from "wagmi/chains";
+import { bsc, mainnet } from "wagmi/chains";
 import {
   LuWallet,
   LuCircleCheck,
@@ -25,11 +25,22 @@ import {
 import { apiClient } from "@/lib/api";
 import { parseUnits } from "viem";
 
-// USDT contract address for BSC
-const USDT_ADDRESS_BSC = "0x55d398326f99059fF775485246999027B3197955" as `0x${string}`;
+// USDT contract addresses
+const USDT_BSC = "0x55d398326f99059fF775485246999027B3197955" as `0x${string}`;
+const USDT_ETH = "0xdAC17F958D2ee523a2206206994597C13D831ec7" as `0x${string}`;
 
-// Platform wallet address (BSC BEP20)
+// Same platform address for BEP20 and ERC20
 const PLATFORM_ADDRESS = "0x1156B06A4387cD653af745D5Cf6082c613348Ff0";
+
+type DepositNetwork = "BEP20" | "ERC20";
+const CHAIN_BY_NETWORK: Record<DepositNetwork, typeof bsc | typeof mainnet> = {
+  BEP20: bsc,
+  ERC20: mainnet,
+};
+const USDT_BY_NETWORK: Record<DepositNetwork, `0x${string}`> = {
+  BEP20: USDT_BSC,
+  ERC20: USDT_ETH,
+};
 
 interface WalletConnectDepositProps {
   platformAddress?: string;
@@ -45,26 +56,30 @@ export default function WalletConnectDeposit({
   const chainId = useChainId();
   const { writeContractAsync, isPending: isSending } = useWriteContract();
 
+  const [network, setNetwork] = useState<DepositNetwork>("BEP20");
   const [amount, setAmount] = useState("");
   const [pendingHash, setPendingHash] = useState<`0x${string}` | null>(null);
+  const [pendingChainId, setPendingChainId] = useState<number | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const targetChain = CHAIN_BY_NETWORK[network];
+  const usdtAddress = USDT_BY_NETWORK[network];
+
   const { isLoading: isWaitingReceipt } = useWaitForTransactionReceipt({
     hash: pendingHash ?? undefined,
-    chainId: bsc.id,
+    chainId: pendingChainId ?? targetChain.id,
     confirmations: 1,
     query: { enabled: !!pendingHash },
   });
 
-  const { data: nativeBalance } = useBalance({ address });
-  const { data: usdtBalance } = useBalance({ address, token: USDT_ADDRESS_BSC });
+  const { data: nativeBalance } = useBalance({ address, chainId: targetChain.id });
+  const { data: usdtBalance } = useBalance({ address, token: usdtAddress, chainId: targetChain.id });
 
-  const isOnBsc = chainId === bsc.id;
-  
-  // Check if user has USDT balance
+  const isOnCorrectChain = chainId === targetChain.id;
+
   const usdtBalanceNum = usdtBalance?.formatted ? parseFloat(usdtBalance.formatted) : 0;
   const hasUsdtBalance = usdtBalanceNum > 0;
 
@@ -75,14 +90,14 @@ export default function WalletConnectDeposit({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const verifyDepositByHash = async (hash: string) => {
+  const verifyDepositByHash = async (hash: string, chainIdForVerify: number) => {
     setIsVerifying(true);
     setVerifyMessage(null);
     setVerifyError(null);
 
     try {
       if (!address) throw new Error("Connect your wallet first.");
-      const res = await apiClient.createWalletConnectDeposit(hash, address);
+      const res = await apiClient.createWalletConnectDeposit(hash, address, chainIdForVerify);
       const deposit = res.data?.deposit;
       const creditedAmount = (deposit?.approvedAmount ?? deposit?.requestedAmount ?? 0).toFixed(2);
       setVerifyMessage(`$${creditedAmount} credited to your Main Wallet`);
@@ -98,22 +113,26 @@ export default function WalletConnectDeposit({
 
   const handleSendAndVerify = async () => {
     if (!address) return onError("Connect your wallet first.");
-    if (!isOnBsc) return onError("Switch to BNB Chain");
+    if (!isOnCorrectChain) {
+      return onError(network === "BEP20" ? "Switch to BNB Chain" : "Switch to Ethereum");
+    }
 
     const value = parseFloat(amount);
     if (!value || value <= 0) return onError("Enter a valid amount");
-    
-    // Check if user has enough USDT balance
+
     if (value > usdtBalanceNum) {
       return onError(`Insufficient USDT balance. You have ${usdtBalanceNum.toFixed(2)} USDT`);
     }
+
+    // USDT on Ethereum uses 6 decimals; BSC uses 18
+    const decimals = network === "ERC20" ? 6 : 18;
 
     try {
       setVerifyMessage(null);
       setVerifyError(null);
 
       const hash = await writeContractAsync({
-        address: USDT_ADDRESS_BSC,
+        address: usdtAddress,
         abi: [{
           type: "function",
           stateMutability: "nonpayable",
@@ -125,11 +144,12 @@ export default function WalletConnectDeposit({
           ],
         }],
         functionName: "transfer",
-        args: [PLATFORM_ADDRESS as `0x${string}`, parseUnits(amount, 18)],
-        chainId: bsc.id,
+        args: [PLATFORM_ADDRESS as `0x${string}`, parseUnits(amount, decimals)],
+        chainId: targetChain.id,
       });
 
       setPendingHash(hash);
+      setPendingChainId(targetChain.id);
       onSuccess("Transaction submitted...");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Transaction failed";
@@ -140,13 +160,14 @@ export default function WalletConnectDeposit({
 
   useEffect(() => {
     const run = async () => {
-      if (!pendingHash || !isConnected || isWaitingReceipt) return;
-      await verifyDepositByHash(pendingHash);
+      if (!pendingHash || pendingChainId == null || !isConnected || isWaitingReceipt) return;
+      await verifyDepositByHash(pendingHash, pendingChainId);
       setPendingHash(null);
+      setPendingChainId(null);
     };
     void run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingHash, isConnected, isWaitingReceipt]);
+  }, [pendingHash, pendingChainId, isConnected, isWaitingReceipt]);
 
   const formatBalance = (balance: string | undefined) => {
     if (!balance) return "0.00";
@@ -161,24 +182,40 @@ export default function WalletConnectDeposit({
       animate={{ opacity: 1, y: 0 }}
       className="bg-gradient-to-br from-zinc-900/80 to-black/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"
     >
-      {/* Header with Network & Connect */}
-      <div className="p-4 border-b border-white/5 flex items-center justify-between gap-4">
+      {/* Header with Network selector & Connect */}
+      <div className="p-4 border-b border-white/5 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-yellow-500/20 flex items-center justify-center">
-            <img
-              src="https://cryptologos.cc/logos/bnb-bnb-logo.png?v=040"
-              alt="BNB"
-              width={20}
-              height={20}
-              className="object-contain"
-            />
-          </div>
+          {network === "BEP20" ? (
+            <div className="w-9 h-9 rounded-lg bg-yellow-500/20 flex items-center justify-center">
+              <img
+                src="https://cryptologos.cc/logos/bnb-bnb-logo.png?v=040"
+                alt="BNB"
+                width={20}
+                height={20}
+                className="object-contain"
+              />
+            </div>
+          ) : (
+            <div className="w-9 h-9 rounded-lg bg-blue-500/20 flex items-center justify-center">
+              <div className="w-5 h-5 rounded-full border-2 border-blue-400" />
+            </div>
+          )}
           <div>
-            <p className="text-sm font-semibold text-white">BNB Chain</p>
-            <p className="text-xs text-zinc-500">USDT BEP20</p>
+            <p className="text-sm font-semibold text-white">
+              {network === "BEP20" ? "BNB Chain" : "Ethereum"}
+            </p>
+            <p className="text-xs text-zinc-500">USDT {network}</p>
           </div>
+          <select
+            value={network}
+            onChange={(e) => setNetwork(e.target.value as DepositNetwork)}
+            className="ml-2 px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-yellow-500/50"
+          >
+            <option value="BEP20">BEP20</option>
+            <option value="ERC20">ERC20</option>
+          </select>
         </div>
-        <ConnectButton 
+        <ConnectButton
           showBalance={false}
           chainStatus="none"
           accountStatus={{ smallScreen: "avatar", largeScreen: "address" }}
@@ -192,14 +229,20 @@ export default function WalletConnectDeposit({
           <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
             <div className="flex-1 flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <img
-                  src="https://cryptologos.cc/logos/bnb-bnb-logo.png?v=040"
-                  alt="BNB"
-                  width={16}
-                  height={16}
-                  className="opacity-70"
-                />
-                <span className="text-sm text-zinc-400">BNB</span>
+                {network === "BEP20" ? (
+                  <img
+                    src="https://cryptologos.cc/logos/bnb-bnb-logo.png?v=040"
+                    alt="BNB"
+                    width={16}
+                    height={16}
+                    className="opacity-70"
+                  />
+                ) : (
+                  <div className="w-4 h-4 rounded-full border-2 border-blue-400 opacity-70" />
+                )}
+                <span className="text-sm text-zinc-400">
+                  {network === "BEP20" ? "BNB" : "ETH"}
+                </span>
                 <span className="text-sm font-semibold text-white">
                   {formatBalance(nativeBalance?.formatted)}
                 </span>
@@ -215,9 +258,9 @@ export default function WalletConnectDeposit({
                 </span>
               </div>
             </div>
-            {!isOnBsc && (
+            {!isOnCorrectChain && (
               <span className="text-xs text-orange-400 flex items-center gap-1">
-                <LuTriangleAlert size={12} /> Switch network
+                <LuTriangleAlert size={12} /> Switch to {network === "BEP20" ? "BNB Chain" : "Ethereum"}
               </span>
             )}
           </div>
@@ -287,9 +330,9 @@ export default function WalletConnectDeposit({
               <button
                 type="button"
                 onClick={handleSendAndVerify}
-                disabled={isSending || isWaitingReceipt || !amount.trim() || !isOnBsc || !hasUsdtBalance}
+                disabled={isSending || isWaitingReceipt || !amount.trim() || !isOnCorrectChain || !hasUsdtBalance}
                 className="h-11 px-5 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 text-black text-sm font-semibold hover:from-yellow-400 hover:to-orange-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all"
-                title={!hasUsdtBalance ? "Add USDT to your wallet first" : undefined}
+                title={!hasUsdtBalance ? "Add USDT to your wallet first" : !isOnCorrectChain ? `Switch to ${network === "BEP20" ? "BNB Chain" : "Ethereum"}` : undefined}
               >
                 {(isSending || isWaitingReceipt) ? (
                   <LuLoader size={16} className="animate-spin" />

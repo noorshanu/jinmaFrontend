@@ -222,6 +222,8 @@ export interface Signal {
   id: string;
   type: 'DAILY' | 'REFERRAL' | 'WELCOME';
   timeSlot: 'MORNING' | 'EVENING' | 'REFERRAL' | 'WELCOME' | 'CUSTOM';
+  /** When set by admin (e.g. "09:00"), display as "9:00 AM UTC" on user side */
+  customTime?: string | null;
   title: string;
   description?: string;
   commitPercent: number;
@@ -496,11 +498,12 @@ class ApiClient {
 
   async createWalletConnectDeposit(
     transactionHash: string,
-    senderAddress: string
+    senderAddress: string,
+    chainId?: number
   ): Promise<ApiResponse<DepositResponse>> {
     return this.request<DepositResponse>('/wallet/deposit/walletconnect', {
       method: 'POST',
-      body: JSON.stringify({ transactionHash, senderAddress }),
+      body: JSON.stringify({ transactionHash, senderAddress, chainId }),
     });
   }
 
@@ -532,13 +535,21 @@ class ApiClient {
     return this.request<WithdrawalSettingsResponse>('/withdrawal/settings');
   }
 
+  async sendWithdrawalOTP(): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>('/withdrawal/send-otp', {
+      method: 'POST',
+    });
+  }
+
   async createWithdrawal(
     amount: number,
-    walletAddress: string
+    walletAddress: string,
+    network: string,
+    otp: string
   ): Promise<ApiResponse<WithdrawalResponse>> {
     return this.request<WithdrawalResponse>('/withdrawal', {
       method: 'POST',
-      body: JSON.stringify({ amount, walletAddress }),
+      body: JSON.stringify({ amount, walletAddress, network, otp }),
     });
   }
 

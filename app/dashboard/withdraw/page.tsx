@@ -68,6 +68,11 @@ export default function WithdrawPage() {
   // Form state
   const [amount, setAmount] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
+  const [network, setNetwork] = useState<"TRC20" | "BEP20" | "ERC20">("TRC20");
+  const [otpStep, setOtpStep] = useState<"form" | "otp">("form");
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [otpSentAt, setOtpSentAt] = useState<number | null>(null);
 
   // Cancel modal
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -101,33 +106,97 @@ export default function WithdrawPage() {
     }
   };
 
+  const handleRequestOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (!amount || parseFloat(amount) <= 0) {
+      setError("Please enter a valid amount");
+      return;
+    }
+    if (!walletAddress.trim()) {
+      setError("Please enter a wallet address");
+      return;
+    }
+    setSendingOtp(true);
+    try {
+      const res = await apiClient.sendWithdrawalOTP();
+      if (res.success) {
+        setOtpStep("otp");
+        setOtp(["", "", "", "", "", ""]);
+        setOtpSentAt(Date.now());
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send verification code");
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleOtpChange = (index: number, value: string) => {
+    if (value.length > 1) {
+      const digits = value.replace(/\D/g, "").slice(0, 6).split("");
+      const newOtp = [...otp];
+      digits.forEach((d, i) => {
+        if (index + i < 6) newOtp[index + i] = d;
+      });
+      setOtp(newOtp);
+      const nextIdx = Math.min(index + digits.length, 5);
+      document.getElementById(`withdraw-otp-${nextIdx}`)?.focus();
+      return;
+    }
+    const newOtp = [...otp];
+    newOtp[index] = value.replace(/\D/g, "").slice(-1);
+    setOtp(newOtp);
+    if (value && index < 5) document.getElementById(`withdraw-otp-${index + 1}`)?.focus();
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
+      document.getElementById(`withdraw-otp-${index - 1}`)?.focus();
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSuccess("");
 
+    if (otpStep === "form") {
+      handleRequestOtp(e);
+      return;
+    }
+
+    const otpCode = otp.join("");
+    if (otpCode.length !== 6) {
+      setError("Please enter the 6-digit code from your email");
+      return;
+    }
+
     if (!amount || parseFloat(amount) <= 0) {
       setError("Please enter a valid amount");
       return;
     }
-
     if (!walletAddress.trim()) {
       setError("Please enter a wallet address");
       return;
     }
 
     setSubmitting(true);
-
     try {
       const res = await apiClient.createWithdrawal(
         parseFloat(amount),
-        walletAddress.trim()
+        walletAddress.trim(),
+        network,
+        otpCode
       );
-
       if (res.success) {
         setSuccess("Withdrawal request submitted successfully!");
         setAmount("");
         setWalletAddress("");
+        setNetwork("TRC20");
+        setOtpStep("form");
+        setOtp(["", "", "", "", "", ""]);
+        setOtpSentAt(null);
         fetchData();
       }
     } catch (err) {
@@ -226,7 +295,7 @@ export default function WithdrawPage() {
         >
             <h1 className="text-3xl font-bold text-white mb-2">Withdraw</h1>
             <p className="text-zinc-400">
-              Withdraw USDT to your TRC20 wallet
+              Withdraw USDT to your wallet (Tron, BEP20, or ERC20)
             </p>
         </motion.div>
 
@@ -409,23 +478,43 @@ export default function WithdrawPage() {
                     )}
             </div>
 
-                  {/* TRC20 Address */}
-            <div>
+                  {/* Network */}
+                  <div>
                     <label className="block text-sm text-zinc-400 mb-2">
-                      TRC20 Wallet Address (USDT)
-              </label>
-              <input
-                type="text"
-                value={walletAddress}
-                onChange={(e) => setWalletAddress(e.target.value)}
-                      placeholder="T..."
+                      Network
+                    </label>
+                    <select
+                      value={network}
+                      onChange={(e) => setNetwork(e.target.value as "TRC20" | "BEP20" | "ERC20")}
+                      disabled={!settings?.isWithdrawalOpen || hasPendingWithdrawal}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="TRC20">Tron (TRC20)</option>
+                      <option value="BEP20">BEP20 (BSC)</option>
+                      <option value="ERC20">ERC20 (Ethereum)</option>
+                    </select>
+                    <p className="text-zinc-500 text-xs mt-1">
+                      Select the network of your withdrawal address.
+                    </p>
+                  </div>
+
+                  {/* Wallet Address */}
+                  <div>
+                    <label className="block text-sm text-zinc-400 mb-2">
+                      Wallet Address (USDT – {network})
+                    </label>
+                    <input
+                      type="text"
+                      value={walletAddress}
+                      onChange={(e) => setWalletAddress(e.target.value)}
+                      placeholder={network === "TRC20" ? "T..." : "0x..."}
                       disabled={!settings?.isWithdrawalOpen || hasPendingWithdrawal}
                       className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm"
                     />
                     <p className="text-zinc-500 text-xs mt-1">
-                      Only TRC20 network is supported. Make sure your address is correct.
-              </p>
-            </div>
+                      Make sure the address matches the selected network.
+                    </p>
+                  </div>
 
                   {/* Fee Breakdown */}
                   {amount && parseFloat(amount) > 0 && (
@@ -446,14 +535,46 @@ export default function WithdrawPage() {
                           ${calculateNetAmount().toFixed(2)} USDT
                         </span>
                       </div>
-            </div>
+                    </div>
                   )}
 
-            {/* Submit Button */}
-            <button
-              type="submit"
+                  {/* OTP step */}
+                  {otpStep === "otp" && (
+                    <div className="p-4 bg-white/5 rounded-xl space-y-3">
+                      <p className="text-zinc-300 text-sm">
+                        Enter the 6-digit code sent to your email.
+                      </p>
+                      <div className="flex gap-2 justify-center">
+                        {otp.map((digit, index) => (
+                          <input
+                            key={index}
+                            id={`withdraw-otp-${index}`}
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={6}
+                            value={digit}
+                            onChange={(e) => handleOtpChange(index, e.target.value)}
+                            onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                            className="w-11 h-12 text-center text-lg font-semibold bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                          />
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setOtpStep("form")}
+                        className="text-sm text-zinc-400 hover:text-white"
+                      >
+                        Change amount or address
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Submit / Get code button */}
+                  <button
+                    type="submit"
                     disabled={
                       submitting ||
+                      sendingOtp ||
                       !settings?.isWithdrawalOpen ||
                       hasPendingWithdrawal ||
                       !amount ||
@@ -461,15 +582,25 @@ export default function WithdrawPage() {
                     }
                     className="w-full py-4 bg-[#3e82f0] rounded-xl font-semibold text-white transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
                   >
-                    {submitting ? (
+                    {sendingOtp ? (
                       <>
                         <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Processing...
+                        Sending code...
+                      </>
+                    ) : submitting ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Submitting...
+                      </>
+                    ) : otpStep === "form" ? (
+                      <>
+                        <LuSend size={18} />
+                        Get verification code
                       </>
                     ) : (
                       <>
                         <LuSend size={18} />
-                        Submit Withdrawal Request
+                        Submit withdrawal request
                       </>
                     )}
                   </button>
@@ -491,7 +622,7 @@ export default function WithdrawPage() {
                 <ul className="space-y-3 text-sm text-zinc-300">
                   <li className="flex items-start gap-2">
                     <LuArrowRight size={16} className="text-blue-400 mt-0.5 flex-shrink-0" />
-                    <span>Only <strong className="text-white">USDT TRC20</strong> withdrawals are supported.</span>
+                    <span>USDT on <strong className="text-white">Tron (TRC20)</strong>, <strong className="text-white">BEP20</strong>, or <strong className="text-white">ERC20</strong>. Select the network that matches your address.</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <LuArrowRight size={16} className="text-blue-400 mt-0.5 flex-shrink-0" />
@@ -503,7 +634,11 @@ export default function WithdrawPage() {
                   </li>
                   <li className="flex items-start gap-2">
                     <LuArrowRight size={16} className="text-blue-400 mt-0.5 flex-shrink-0" />
-                    <span>You will receive an email notification when your withdrawal is processed.</span>
+                    <span>You must verify with a code sent to your email before submitting a withdrawal.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <LuArrowRight size={16} className="text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>You will receive an email when your withdrawal is processed.</span>
                   </li>
                 </ul>
               </div>
@@ -585,10 +720,17 @@ export default function WithdrawPage() {
                     <div className="ml-13 pl-13 text-sm">
                       <p className="text-zinc-400 font-mono text-xs truncate">
                         To: {withdrawal.walletAddress}
+                        <span className="text-zinc-500 ml-1">({withdrawal.network})</span>
                       </p>
                       {withdrawal.transactionHash && (
                         <a
-                          href={`https://tronscan.org/#/transaction/${withdrawal.transactionHash}`}
+                          href={
+                            withdrawal.network === "TRC20"
+                              ? `https://tronscan.org/#/transaction/${withdrawal.transactionHash}`
+                              : withdrawal.network === "BEP20"
+                              ? `https://bscscan.com/tx/${withdrawal.transactionHash}`
+                              : `https://etherscan.io/tx/${withdrawal.transactionHash}`
+                          }
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-blue-400 hover:text-blue-300 text-xs flex items-center gap-1 mt-1"

@@ -9,6 +9,23 @@ import DashboardFooter from "@/components/DashboardFooter";
 import { apiClient, Signal, SignalLimits, SignalHistoryItem, UserProfileResponse, WalletResponse } from "@/lib/api";
 import { LuRefreshCw, LuClock, LuTrendingUp, LuTrendingDown, LuArrowRight } from "react-icons/lu";
 
+/** Format admin-set time (HH:mm) to "9:00 AM UTC" for display */
+function formatSignalTimeUtc(signal: { timeSlot: string; customTime?: string | null }): string {
+  const ct = signal.customTime?.trim();
+  if (ct && /^\d{1,2}:\d{2}$/.test(ct)) {
+    const [h, m] = ct.split(":").map(Number);
+    const hour = h % 24;
+    const am = hour < 12;
+    const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    return `${hour12}:${m.toString().padStart(2, "0")} ${am ? "AM" : "PM"} UTC`;
+  }
+  if (signal.timeSlot === "MORNING") return "9:00 AM UTC";
+  if (signal.timeSlot === "EVENING") return "7:00 PM UTC";
+  if (signal.timeSlot === "REFERRAL") return "3:00 PM UTC";
+  if (signal.timeSlot === "WELCOME" || signal.timeSlot === "CUSTOM") return "—";
+  return "—";
+}
+
 export default function SignalsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"daily" | "referral" | "welcome" | "history">("daily");
@@ -114,6 +131,7 @@ export default function SignalsPage() {
       signalType: signal.type,
       commitPercent: signal.commitPercent.toString(),
       timeSlot: signal.timeSlot,
+      ...(signal.customTime ? { customTime: signal.customTime } : {}),
     });
     
     router.push(`/dashboard/trade?${params.toString()}`);
@@ -450,7 +468,7 @@ export default function SignalsPage() {
                             <div>
                               <p className="text-white font-medium">{signal.title}</p>
                               <p className="text-zinc-400 text-sm">
-                                {signal.timeSlot === "MORNING" ? "9:00 AM UTC" : "7:00 PM UTC"} • {signal.commitPercent}% of balance
+                                {formatSignalTimeUtc(signal)} • {signal.commitPercent}% of balance
                               </p>
                             </div>
                           </div>
@@ -526,7 +544,7 @@ export default function SignalsPage() {
                             <div>
                               <p className="text-white font-medium">{signal.title}</p>
                               <p className="text-zinc-400 text-sm">
-                                3:00 PM UTC • {signal.commitPercent}% of balance
+                                {formatSignalTimeUtc(signal)} • {signal.commitPercent}% of balance
                               </p>
                             </div>
                           </div>
@@ -577,7 +595,7 @@ export default function SignalsPage() {
             </div>
           )}
 
-          {/* Welcome Signals Tab (from admin) */}
+          {/* Welcome Bonus Tab (from admin) */}
           {activeTab === "welcome" && (
             <div className="space-y-6">
               <motion.div
@@ -585,10 +603,10 @@ export default function SignalsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl"
               >
-                <h2 className="text-xl font-semibold text-white mb-1">Welcome signals</h2>
+                <h2 className="text-xl font-semibold text-white mb-1">Welcome Bonus</h2>
                 <p className="text-violet-400/90 text-sm mb-4">Sent by admin — use these to trade</p>
                 {welcomeSignals.length === 0 ? (
-                  <p className="text-zinc-400 text-center py-8">No welcome signals from admin right now</p>
+                  <p className="text-zinc-400 text-center py-8">No Welcome Bonus from admin right now</p>
                 ) : (
                   <div className="space-y-3">
                     {welcomeSignals.map((signal) => (
@@ -602,7 +620,7 @@ export default function SignalsPage() {
                             <div>
                               <p className="text-white font-medium">{signal.title}</p>
                               <p className="text-violet-400/90 text-sm">
-                                Welcome signal (from admin) • {signal.commitPercent}% of balance
+                                Welcome Bonus (from admin) • {formatSignalTimeUtc(signal) !== "—" ? `${formatSignalTimeUtc(signal)} • ` : ""}{signal.commitPercent}% of balance
                               </p>
                             </div>
                           </div>
@@ -802,7 +820,7 @@ export default function SignalsPage() {
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-400 text-sm">Trading Time</span>
                   <span className="text-white font-medium">
-                    {confirmModal.signal.timeSlot === "MORNING" ? "9:00 AM" : confirmModal.signal.timeSlot === "EVENING" ? "7:00 PM" : "3:00 PM"} UTC {confirmModal.signal.type}
+                    {formatSignalTimeUtc(confirmModal.signal)} {confirmModal.signal.type}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">

@@ -26,6 +26,12 @@ export default function BonusHistory({ bonuses }: BonusHistoryProps) {
     });
   };
 
+  // First name only from full name
+  const firstName = (name: string | null | undefined) => {
+    if (!name?.trim()) return "Unknown";
+    return name.trim().split(/\s+/)[0] ?? "Unknown";
+  };
+
   return (
     <motion.div
       key="bonuses"
@@ -51,18 +57,16 @@ export default function BonusHistory({ bonuses }: BonusHistoryProps) {
             <div key={bonus.id} className="p-6 hover:bg-white/5 transition-colors">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2">
                     <h3 className="text-white font-medium">
-                      {bonus.referee?.name || "Unknown User"}
+                      {firstName(bonus.referee?.name)}
                     </h3>
                     <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded-full">
                       Level {bonus.level}
                     </span>
                   </div>
-                  <p className="text-zinc-400 text-sm">{bonus.referee?.email}</p>
                   <p className="text-zinc-500 text-xs mt-1">
-                    {formatDate(bonus.createdAt)} • Based on $
-                    {bonus.basedOnAmount.toFixed(2)} • {bonus.bonusPercent}% bonus
+                    {formatDate(bonus.createdAt)}
                   </p>
                 </div>
                 <div className="text-right">

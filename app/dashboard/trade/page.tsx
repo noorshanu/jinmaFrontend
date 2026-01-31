@@ -32,6 +32,7 @@ interface SignalData {
   signalType: "DAILY" | "REFERRAL" | "WELCOME";
   commitPercent: number;
   timeSlot: string;
+  customTime?: string;
 }
 
 function TradeContent() {
@@ -44,6 +45,7 @@ function TradeContent() {
     const signalType = searchParams.get("signalType") as "DAILY" | "REFERRAL" | "WELCOME" | null;
     const commitPercent = searchParams.get("commitPercent");
     const timeSlot = searchParams.get("timeSlot") || "";
+    const customTime = searchParams.get("customTime") || undefined;
     if (!signalId || !signalTitle || !commitPercent) return null;
     const type = signalType === "WELCOME" || signalType === "REFERRAL" || signalType === "DAILY" ? signalType : "DAILY";
     return {
@@ -52,6 +54,7 @@ function TradeContent() {
       signalType: type,
       commitPercent: parseFloat(commitPercent),
       timeSlot: timeSlot || (type === "WELCOME" ? "WELCOME" : ""),
+      customTime,
     };
   }, [searchParams]);
 
@@ -115,8 +118,17 @@ function TradeContent() {
     );
   };
 
-  const getTradingTime = (timeSlot: string) => {
-    switch (timeSlot) {
+  /** Format time for display: use customTime (HH:mm) from admin or fallback by timeSlot */
+  const getTradingTime = (slot: string, custom?: string | null) => {
+    const ct = custom?.trim();
+    if (ct && /^\d{1,2}:\d{2}$/.test(ct)) {
+      const [h, m] = ct.split(":").map(Number);
+      const hour = h % 24;
+      const am = hour < 12;
+      const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+      return `${hour12}:${m.toString().padStart(2, "0")} ${am ? "AM" : "PM"} UTC`;
+    }
+    switch (slot) {
       case "MORNING":
         return "9:00 AM UTC";
       case "EVENING":
@@ -126,14 +138,14 @@ function TradeContent() {
         return "3:00 PM UTC";
       case "WELCOME":
       case "CUSTOM":
-        return "Welcome signal";
+        return "Welcome Bonus";
       default:
         return getCurrentUTCTime();
     }
   };
 
   const getSignalTypeLabel = (type: string) => {
-    if (type === "WELCOME") return "Welcome signal (from admin)";
+    if (type === "WELCOME") return "Welcome Bonus (from admin)";
     if (type === "REFERRAL") return "Referral";
     return "Daily";
   };
@@ -334,6 +346,7 @@ function TradeContent() {
           signalType: signal.type,
           commitPercent: signal.commitPercent,
           timeSlot: signal.timeSlot,
+          customTime: signal.customTime ?? undefined,
         });
         setUsageId(res.data.id);
         setCommittedAmount(res.data.committedAmount);
@@ -506,7 +519,7 @@ function TradeContent() {
                         <div>
                           <p className="font-medium text-white">{s.title}</p>
                           <p className="text-sm text-zinc-400">
-                            {getSignalTypeLabel(s.type)} • {s.commitPercent}% of balance • {formatTimeRemaining(s.timeRemaining)} left
+                            {getSignalTypeLabel(s.type)} • {getTradingTime(s.timeSlot, s.customTime)} • {s.commitPercent}% of balance • {formatTimeRemaining(s.timeRemaining)} left
                           </p>
                         </div>
                         <button
@@ -615,7 +628,7 @@ function TradeContent() {
                   <p className="text-zinc-300 text-sm mb-2">You selected from Signals page</p>
                   <p className="text-white font-medium">{signalDataFromUrl.signalTitle}</p>
                   <p className="text-zinc-400 text-sm mt-1">
-                    {getSignalTypeLabel(signalDataFromUrl.signalType)} • {signalDataFromUrl.commitPercent}% of balance
+                    {getSignalTypeLabel(signalDataFromUrl.signalType)} • {getTradingTime(signalDataFromUrl.timeSlot, signalDataFromUrl.customTime)} • {signalDataFromUrl.commitPercent}% of balance
                   </p>
                   <button
                     onClick={() => {
@@ -666,6 +679,10 @@ function TradeContent() {
                 <div className="flex justify-between text-sm">
                   <span className="text-zinc-400">Type</span>
                   <span className="text-white">{getSignalTypeLabel(selectedSignalForConfirm.type)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-400">Time (UTC)</span>
+                  <span className="text-white">{getTradingTime(selectedSignalForConfirm.timeSlot, selectedSignalForConfirm.customTime)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-zinc-400">Commit</span>
