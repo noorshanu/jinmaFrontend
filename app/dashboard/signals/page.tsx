@@ -376,13 +376,13 @@ export default function SignalsPage() {
               className="mb-6 grid grid-cols-2 md:grid-cols-4 gap-4"
             >
               <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4">
-                <p className="text-zinc-400 text-sm">Daily Used</p>
+                <p className="text-zinc-400 text-sm">CORE Used</p>
                 <p className="text-2xl font-bold text-white">
                   {limits.dailySignalsUsed}/{limits.maxDailySignals}
                 </p>
               </div>
               <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4">
-                <p className="text-zinc-400 text-sm">Daily Remaining</p>
+                <p className="text-zinc-400 text-sm">CORE Remaining</p>
                 <p className="text-2xl font-bold text-green-400">{limits.dailySignalsRemaining}</p>
               </div>
               <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4">
@@ -408,7 +408,7 @@ export default function SignalsPage() {
                   : "text-zinc-400 hover:text-white"
               }`}
             >
-              Daily ({dailySignals.length})
+              CORE SIGNALS ({dailySignals.length})
             </button>
             {limits !== null && limits.referralSignalsRemaining > 0 && (
             <button
@@ -430,7 +430,7 @@ export default function SignalsPage() {
                   : "text-zinc-400 hover:text-white"
               }`}
             >
-              Welcome ({welcomeSignals.length})
+              WELCOME SWING SIGNALS ({welcomeSignals.length})
             </button>
             <button
               onClick={() => setActiveTab("history")}
@@ -444,7 +444,7 @@ export default function SignalsPage() {
             </button>
           </div>
 
-          {/* Daily Signals Tab */}
+          {/* CORE SIGNALS Tab */}
           {activeTab === "daily" && (
             <div className="space-y-6">
               <motion.div
@@ -452,9 +452,9 @@ export default function SignalsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl"
               >
-                <h2 className="text-xl font-semibold text-white mb-4">Available Daily Signals</h2>
+                <h2 className="text-xl font-semibold text-white mb-4">Available CORE SIGNALS</h2>
                 {dailySignals.length === 0 ? (
-                  <p className="text-zinc-400 text-center py-8">No daily signals available right now</p>
+                  <p className="text-zinc-400 text-center py-8">No CORE signals available right now</p>
                 ) : (
                   <div className="space-y-3">
                     {dailySignals.map((signal) => (
@@ -501,7 +501,7 @@ export default function SignalsPage() {
                 transition={{ delay: 0.1 }}
                 className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-6"
               >
-                <h3 className="text-lg font-semibold text-blue-300 mb-3">📅 Daily Schedule (UTC)</h3>
+                <h3 className="text-lg font-semibold text-blue-300 mb-3">📅 CORE Schedule (UTC)</h3>
                 <div className="space-y-2 text-sm text-blue-400/80">
                   <div className="flex items-center justify-between">
                     <span>9:00 AM UTC</span>
@@ -595,7 +595,7 @@ export default function SignalsPage() {
             </div>
           )}
 
-          {/* Welcome Bonus Tab (from admin) */}
+          {/* WELCOME SWING SIGNALS Tab (from admin) */}
           {activeTab === "welcome" && (
             <div className="space-y-6">
               <motion.div
@@ -603,10 +603,10 @@ export default function SignalsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl"
               >
-                <h2 className="text-xl font-semibold text-white mb-1">Welcome Bonus</h2>
+                <h2 className="text-xl font-semibold text-white mb-1">WELCOME SWING SIGNALS</h2>
                 <p className="text-violet-400/90 text-sm mb-4">Sent by admin — use these to trade</p>
                 {welcomeSignals.length === 0 ? (
-                  <p className="text-zinc-400 text-center py-8">No Welcome Bonus from admin right now</p>
+                  <p className="text-zinc-400 text-center py-8">No WELCOME SWING SIGNALS from admin right now</p>
                 ) : (
                   <div className="space-y-3">
                     {welcomeSignals.map((signal) => (
@@ -620,7 +620,7 @@ export default function SignalsPage() {
                             <div>
                               <p className="text-white font-medium">{signal.title}</p>
                               <p className="text-violet-400/90 text-sm">
-                                Welcome Bonus (from admin) • {formatSignalTimeUtc(signal) !== "—" ? `${formatSignalTimeUtc(signal)} • ` : ""}{signal.commitPercent}% of balance
+                                WELCOME SWING SIGNALS (from admin) • {formatSignalTimeUtc(signal) !== "—" ? `${formatSignalTimeUtc(signal)} • ` : ""}{signal.commitPercent}% of balance
                               </p>
                             </div>
                           </div>

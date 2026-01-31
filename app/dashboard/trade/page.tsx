@@ -138,16 +138,16 @@ function TradeContent() {
         return "3:00 PM UTC";
       case "WELCOME":
       case "CUSTOM":
-        return "Welcome Bonus";
+        return "WELCOME SWING SIGNALS";
       default:
         return getCurrentUTCTime();
     }
   };
 
   const getSignalTypeLabel = (type: string) => {
-    if (type === "WELCOME") return "Welcome Bonus (from admin)";
+    if (type === "WELCOME") return "WELCOME SWING SIGNALS (from admin)";
     if (type === "REFERRAL") return "Referral";
-    return "Daily";
+    return "CORE SIGNALS";
   };
 
   const formatTimeRemaining = (seconds: number) => {
