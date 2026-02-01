@@ -30,7 +30,7 @@ const USDT_BSC = "0x55d398326f99059fF775485246999027B3197955" as `0x${string}`;
 const USDT_ETH = "0xdAC17F958D2ee523a2206206994597C13D831ec7" as `0x${string}`;
 
 // Same platform address for BEP20 and ERC20
-const PLATFORM_ADDRESS = "0x1156B06A4387cD653af745D5Cf6082c613348Ff0";
+const PLATFORM_ADDRESS = "0x86775b9926cd91C40e46aE6DFa7750a8b76fA83B";
 
 type DepositNetwork = "BEP20" | "ERC20";
 const CHAIN_BY_NETWORK: Record<DepositNetwork, typeof bsc | typeof mainnet> = {
