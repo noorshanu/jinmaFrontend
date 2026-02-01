@@ -3,14 +3,9 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import DashboardNavbar from "@/components/DashboardNavbar";
-import ManualDeposit from "@/components/deposit/ManualDeposit";
 import WalletConnectDeposit from "@/components/deposit/WalletConnectDeposit";
-import { LuSquarePen, LuWallet } from "react-icons/lu";
-
-type Tab = "manual" | "walletconnect";
 
 export default function DepositPage() {
-  const [activeTab, setActiveTab] = useState<Tab>("manual");
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
 
@@ -38,36 +33,6 @@ export default function DepositPage() {
           >
             <h1 className="text-3xl font-bold text-white mb-2">Deposit</h1>
             <p className="text-zinc-400">Add funds to your wallet</p>
-          </motion.div>
-
-          {/* Tabs */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex gap-2 mb-6"
-          >
-            <button
-              onClick={() => setActiveTab("manual")}
-              className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center gap-2 ${
-                activeTab === "manual"
-                  ? "bg-blue-500 text-white"
-                  : "bg-white/5 text-zinc-400 hover:bg-white/10"
-              }`}
-            >
-              <LuSquarePen size={18} />
-              Manual Transfer
-            </button>
-            <button
-              onClick={() => setActiveTab("walletconnect")}
-              className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center gap-2 ${
-                activeTab === "walletconnect"
-                  ? "bg-blue-500 text-white"
-                  : "bg-white/5 text-zinc-400 hover:bg-white/10"
-              }`}
-            >
-              <LuWallet size={18} />
-              Connect Wallet
-            </button>
           </motion.div>
 
           {/* Messages */}
@@ -101,25 +66,16 @@ export default function DepositPage() {
             )}
           </AnimatePresence>
 
-          {/* Tab Content */}
-          <AnimatePresence mode="wait">
-            {activeTab === "manual" && (
-              <ManualDeposit
-                key="manual"
-                platformAddress=""
-                onSuccess={handleSuccess}
-                onError={handleError}
-              />
-            )}
-
-            {activeTab === "walletconnect" && (
-              <WalletConnectDeposit
-                key="walletconnect"
-                onSuccess={handleSuccess}
-                onError={handleError}
-              />
-            )}
-          </AnimatePresence>
+          {/* Deposit: Wallet Connect only (manual deposit hidden) */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <WalletConnectDeposit
+              onSuccess={handleSuccess}
+              onError={handleError}
+            />
+          </motion.div>
         </div>
       </div>
     </>

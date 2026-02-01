@@ -703,11 +703,17 @@ class ApiClient {
     return this.request<UserProfileResponse>('/user/profile');
   }
 
-  // Chat (1:1 with admin)
+  // Chat (group + 1:1 with admin)
   async getChatConversation(): Promise<
-    ApiResponse<{ id: string; user: string; adminParticipant: string | null; createdAt: string }>
+    ApiResponse<{ id: string; type?: string; user: string; adminParticipant: string | null; createdAt: string }>
   > {
     return this.request('/chat/conversation');
+  }
+
+  async getGroupConversation(): Promise<
+    ApiResponse<{ id: string; type: string; user: null; adminParticipant: null; createdAt: string }>
+  > {
+    return this.request('/chat/group/conversation');
   }
 
   async getChatMessages(

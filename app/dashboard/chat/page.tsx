@@ -6,9 +6,10 @@ import Link from "next/link";
 import DashboardNavbar from "@/components/DashboardNavbar";
 import DashboardFooter from "@/components/DashboardFooter";
 import { apiClient, ChatMessage } from "@/lib/api";
-import { LuRefreshCw, LuSend, LuMessageCircle, LuImage, LuUser } from "react-icons/lu";
+import { LuRefreshCw, LuSend, LuMessageCircle, LuImage, LuUser, LuUsers, LuHeadphones } from "react-icons/lu";
 
 const POLL_INTERVAL_MS = 6000;
+type Tab = "group" | "private";
 
 function getInitials(sender: ChatMessage["sender"]) {
   if (!sender) return "A";
@@ -18,8 +19,14 @@ function getInitials(sender: ChatMessage["sender"]) {
   return sender.email?.charAt(0)?.toUpperCase() || "U";
 }
 
+function isAdminSender(m: ChatMessage) {
+  return m.sender?.role === "ADMIN" || m.sender?.role === "admin";
+}
+
 export default function ChatPage() {
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("group");
+  const [groupConvId, setGroupConvId] = useState<string | null>(null);
+  const [privateConvId, setPrivateConvId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
@@ -30,71 +37,101 @@ export default function ChatPage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchConversation = useCallback(async () => {
+  const currentConvId = tab === "group" ? groupConvId : privateConvId;
+
+  const fetchGroupConversation = useCallback(async () => {
     try {
-      const res = await apiClient.getChatConversation();
+      const res = await apiClient.getGroupConversation();
       if (res.success && res.data) {
-        setConversationId(res.data.id);
+        setGroupConvId(res.data.id);
         return res.data.id;
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load chat");
+      setError(e instanceof Error ? e.message : "Failed to load group chat");
     }
     return null;
   }, []);
 
-  const fetchMessages = useCallback(
-    async (convId: string) => {
-      if (!convId) return;
-      try {
-        const res = await apiClient.getChatMessages(convId, { limit: 100 });
-        if (res.success && res.data?.messages) {
-          setMessages(res.data.messages);
-        }
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load messages");
+  const fetchPrivateConversation = useCallback(async () => {
+    try {
+      const res = await apiClient.getChatConversation();
+      if (res.success && res.data) {
+        setPrivateConvId(res.data.id);
+        return res.data.id;
       }
-    },
-    []
-  );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load support chat");
+    }
+    return null;
+  }, []);
+
+  const fetchMessages = useCallback(async (convId: string) => {
+    if (!convId) return;
+    try {
+      const res = await apiClient.getChatMessages(convId, { limit: 100 });
+      if (res.success && res.data?.messages) {
+        setMessages(res.data.messages);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load messages");
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
     const init = async () => {
       setLoading(true);
       setError(null);
-      const convId = await fetchConversation();
-      if (mounted && convId) {
-        await fetchMessages(convId);
+      const groupId = await fetchGroupConversation();
+      const privateId = await fetchPrivateConversation();
+      if (mounted) {
+        setLoading(false);
+        if (tab === "group" && groupId) await fetchMessages(groupId);
+        if (tab === "private" && privateId) await fetchMessages(privateId);
       }
-      if (mounted) setLoading(false);
     };
     init();
     return () => {
       mounted = false;
     };
-  }, [fetchConversation, fetchMessages]);
+  }, [fetchGroupConversation, fetchPrivateConversation]);
 
   useEffect(() => {
-    if (!conversationId) return;
-    const interval = setInterval(() => {
-      fetchMessages(conversationId);
-    }, POLL_INTERVAL_MS);
+    if (tab === "group" && groupConvId) {
+      fetchMessages(groupConvId);
+    } else if (tab === "private" && privateConvId) {
+      fetchMessages(privateConvId);
+    }
+  }, [tab]);
+
+  useEffect(() => {
+    if (!currentConvId) return;
+    const interval = setInterval(() => fetchMessages(currentConvId), POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [conversationId, fetchMessages]);
+  }, [currentConvId, fetchMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const handleTabChange = (t: Tab) => {
+    setTab(t);
+    setError(null);
+  };
+
+  useEffect(() => {
+    if (tab === "group" && groupConvId) fetchMessages(groupConvId);
+    else if (tab === "private" && privateConvId) fetchMessages(privateConvId);
+  }, [tab, groupConvId, privateConvId, fetchMessages]);
+
   const handleSend = async () => {
     const text = content.trim();
-    if (!conversationId || sending) return;
+    if (!currentConvId || sending) return;
     if (!text) return;
     setSending(true);
     setError(null);
     try {
-      const res = await apiClient.sendChatMessage(conversationId, text);
+      const res = await apiClient.sendChatMessage(currentConvId, text);
       if (res.success && res.data) {
         setMessages((prev) => [...prev, res.data!]);
         setContent("");
@@ -108,7 +145,7 @@ export default function ChatPage() {
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !conversationId || uploading || sending) return;
+    if (!file || !currentConvId || uploading || sending) return;
     if (!file.type.startsWith("image/")) {
       setError("Only images are allowed (JPEG, PNG, WebP).");
       e.target.value = "";
@@ -123,7 +160,7 @@ export default function ChatPage() {
         e.target.value = "";
         return;
       }
-      const sendRes = await apiClient.sendChatMessage(conversationId, content.trim() || "", {
+      const sendRes = await apiClient.sendChatMessage(currentConvId, content.trim() || "", {
         type: "image",
         attachment: {
           url: uploadRes.data.url,
@@ -143,9 +180,6 @@ export default function ChatPage() {
       if (e.target) (e.target as HTMLInputElement).value = "";
     }
   };
-
-  const isAdmin = (m: ChatMessage) =>
-    m.sender?.role === "ADMIN" || m.sender?.role === "admin" || m.sender?.email?.toLowerCase().includes("admin");
 
   const sortedMessages = [...messages].sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -177,12 +211,42 @@ export default function ChatPage() {
           >
             <h1 className="text-2xl md:text-3xl font-bold text-white mb-1 flex items-center gap-2">
               <LuMessageCircle className="w-8 h-8 text-blue-400" />
-              Chat with Admin
+              Chat
             </h1>
             <p className="text-zinc-400 text-sm">
-              1:1 support. Only you and admins can see this thread. You can send text and images.
+              {tab === "group"
+                ? "Group chat with all users. Only admins can message you privately."
+                : "Private support. Only you and admins see this thread."}
             </p>
           </motion.div>
+
+          {/* Tabs: Group | Private */}
+          <div className="flex gap-2 mb-4">
+            <button
+              type="button"
+              onClick={() => handleTabChange("group")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                tab === "group"
+                  ? "bg-blue-500/20 border border-blue-500/40 text-blue-300"
+                  : "bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              <LuUsers className="w-4 h-4" />
+              Group Chat
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTabChange("private")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                tab === "private"
+                  ? "bg-blue-500/20 border border-blue-500/40 text-blue-300"
+                  : "bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              <LuHeadphones className="w-4 h-4" />
+              Private Support
+            </button>
+          </div>
 
           {error && (
             <motion.div
@@ -200,14 +264,23 @@ export default function ChatPage() {
             className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden flex flex-col shadow-xl"
             style={{ minHeight: "480px" }}
           >
-            {/* Header strip */}
             <div className="px-4 py-3 border-b border-white/10 bg-white/5 flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
-                <LuUser className="w-5 h-5 text-blue-400" />
+                {tab === "group" ? (
+                  <LuUsers className="w-5 h-5 text-blue-400" />
+                ) : (
+                  <LuUser className="w-5 h-5 text-blue-400" />
+                )}
               </div>
               <div>
-                <p className="font-medium text-white">Admin Support</p>
-                <p className="text-xs text-zinc-500">Replies usually within a few hours</p>
+                <p className="font-medium text-white">
+                  {tab === "group" ? "Group Chat" : "Admin Support"}
+                </p>
+                <p className="text-xs text-zinc-500">
+                  {tab === "group"
+                    ? "All users and admin can see messages"
+                    : "Only you and admins see this thread"}
+                </p>
               </div>
             </div>
 
@@ -221,7 +294,9 @@ export default function ChatPage() {
                     <LuMessageCircle className="w-8 h-8 text-zinc-500" />
                   </div>
                   <p className="text-zinc-400 font-medium">No messages yet</p>
-                  <p className="text-zinc-500 text-sm mt-1">Say hello or send an image to get started.</p>
+                  <p className="text-zinc-500 text-sm mt-1">
+                    {tab === "group" ? "Say hello in the group." : "Send a message to get support."}
+                  </p>
                 </div>
               )}
               {sortedMessages.map((m) => (
@@ -229,23 +304,29 @@ export default function ChatPage() {
                   key={m.id}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`flex gap-3 ${isAdmin(m) ? "flex-row" : "flex-row-reverse"}`}
+                  className={`flex gap-3 ${isAdminSender(m) ? "flex-row" : "flex-row-reverse"}`}
                 >
                   <div className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold bg-white/10 border border-white/10 text-zinc-300">
                     {getInitials(m.sender)}
                   </div>
                   <div
                     className={`max-w-[78%] rounded-2xl px-4 py-2.5 ${
-                      isAdmin(m)
+                      isAdminSender(m)
                         ? "bg-blue-500/20 border border-blue-500/30 text-left rounded-tl-md"
                         : "bg-white/10 border border-white/20 text-right rounded-tr-md"
                     }`}
                   >
-                    <p className="text-xs text-zinc-400 mb-1.5">
-                      {m.sender
-                        ? `${m.sender.firstName || ""} ${m.sender.lastName || ""}`.trim() || m.sender.email
-                        : "Admin"}
-                      {isAdmin(m) && <span className="ml-1 text-blue-400">(Admin)</span>}
+                    <p className="text-xs text-zinc-400 mb-1.5 flex items-center gap-2 flex-wrap">
+                      <span>
+                        {m.sender
+                          ? `${m.sender.firstName || ""} ${m.sender.lastName || ""}`.trim() || m.sender.email
+                          : "Unknown"}
+                      </span>
+                      {isAdminSender(m) && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-500/30 text-amber-300 text-[10px] font-semibold uppercase tracking-wide">
+                          Admin
+                        </span>
+                      )}
                     </p>
                     {m.type === "text" && <p className="text-white text-sm whitespace-pre-wrap">{m.content || ""}</p>}
                     {m.type === "image" && m.attachment?.url && (
