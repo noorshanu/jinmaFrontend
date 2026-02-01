@@ -40,10 +40,21 @@ interface Downline {
   totalReferrals: number;
 }
 
+const defaultStats: ReferralStats = {
+  referralCode: "",
+  referralEarnings: 0,
+  totalReferrals: 0,
+  activeReferrals: 0,
+  bonusPercent: 10,
+  referralUrl: "",
+  recentBonuses: [],
+};
+
 export default function ReferralsPage() {
   const [stats, setStats] = useState<ReferralStats | null>(null);
   const [downline, setDownline] = useState<Downline[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "bonuses" | "downline">("overview");
 
   useEffect(() => {
@@ -53,6 +64,7 @@ export default function ReferralsPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
+      setFetchError(null);
       const [statsRes, downlineRes] = await Promise.all([
         apiClient.getReferralStats(),
         apiClient.getDownline(),
@@ -60,13 +72,20 @@ export default function ReferralsPage() {
 
       if (statsRes.success && statsRes.data) {
         setStats(statsRes.data);
+      } else {
+        setStats(defaultStats);
       }
 
-      if (downlineRes.success && downlineRes.data) {
+      if (downlineRes.success && downlineRes.data?.downline) {
         setDownline(downlineRes.data.downline);
+      } else {
+        setDownline([]);
       }
-    } catch (error: any) {
-      console.error("Error fetching referral data:", error);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Failed to load referral data";
+      setFetchError(msg);
+      setStats(defaultStats);
+      setDownline([]);
     } finally {
       setLoading(false);
     }
@@ -96,31 +115,53 @@ export default function ReferralsPage() {
           >
             <h1 className="text-3xl font-bold text-white mb-2">Referral Program</h1>
             <p className="text-zinc-400">
-              Earn {stats?.bonusPercent}% bonus when your referrals activate trading
+              Earn {(stats?.bonusPercent ?? 10)}% bonus when your referrals get trading activated by admin
             </p>
           </motion.div>
 
-          {/* Stats Cards */}
-          {stats && (
-            <div className="mb-8">
-              <ReferralStats
-                referralEarnings={stats.referralEarnings}
-                totalReferrals={stats.totalReferrals}
-                activeReferrals={stats.activeReferrals}
-                bonusPercent={stats.bonusPercent}
-              />
+          {fetchError && (
+            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-between">
+              <p className="text-red-400 text-sm">{fetchError}</p>
+              <button
+                type="button"
+                onClick={fetchData}
+                className="text-sm font-medium text-red-400 hover:text-red-300"
+              >
+                Retry
+              </button>
             </div>
           )}
 
+          {/* Stats Cards - always show (use defaults if no stats) */}
+          <div className="mb-8">
+            <ReferralStats
+              referralEarnings={stats?.referralEarnings ?? 0}
+              totalReferrals={stats?.totalReferrals ?? 0}
+              activeReferrals={stats?.activeReferrals ?? 0}
+              bonusPercent={stats?.bonusPercent ?? 10}
+            />
+          </div>
+
+          {/* Signups with your code (downline count) */}
+          <div className="mb-6 p-4 bg-white/5 border border-white/10 rounded-xl">
+            <p className="text-zinc-400 text-sm">
+              <span className="text-white font-medium">{downline.length}</span> people signed up with your referral code.
+              {downline.length > 0 && (stats?.totalReferrals ?? 0) === 0 && (
+                <span className="block mt-1 text-zinc-500">
+                  Bonus is paid when admin activates their trading. Ask your referrals to deposit and request activation.
+                </span>
+              )}
+            </p>
+          </div>
+
           {/* Referral Link Card */}
-          {stats && (
-            <div className="mb-8">
-              <ReferralLink
-                referralCode={stats.referralCode}
-                bonusPercent={stats.bonusPercent}
-              />
-            </div>
-          )}
+          <div className="mb-8">
+            <ReferralLink
+              referralCode={stats?.referralCode ?? ""}
+              referralUrl={stats?.referralUrl}
+              bonusPercent={stats?.bonusPercent ?? 10}
+            />
+          </div>
 
           {/* Tabs */}
           <div className="flex gap-2 mb-6">
@@ -158,12 +199,12 @@ export default function ReferralsPage() {
 
           {/* Content */}
           <AnimatePresence mode="wait">
-            {activeTab === "overview" && stats && (
-              <HowItWorks bonusPercent={stats.bonusPercent} />
+            {activeTab === "overview" && (
+              <HowItWorks bonusPercent={stats?.bonusPercent ?? 10} />
             )}
 
-            {activeTab === "bonuses" && stats && (
-              <BonusHistory bonuses={stats.recentBonuses} />
+            {activeTab === "bonuses" && (
+              <BonusHistory bonuses={stats?.recentBonuses ?? []} />
             )}
 
             {activeTab === "downline" && (

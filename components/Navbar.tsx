@@ -11,8 +11,16 @@ const links = [
   { id: "Home", labelKey: "common.home" },
 ];
 
+// Static fallbacks so server and client render the same text (avoids hydration mismatch)
+const labelFallbacks: Record<string, string> = {
+  "common.home": "Home",
+  "common.dashboard": "Dashboard",
+  "common.login": "Login",
+};
+
 export default function Navbar() {
   const { t } = useTranslation();
+  const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState("Home");
   const [scrolled, setScrolled] = useState(false);
@@ -20,6 +28,8 @@ export default function Navbar() {
   const [totalBalance, setTotalBalance] = useState<number | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
   const router = useRouter();
+
+  useEffect(() => setMounted(true), []);
 
   // Check login status and fetch balance
   useEffect(() => {
@@ -78,6 +88,8 @@ export default function Navbar() {
     });
   };
 
+  const navLabel = (key: string) => (mounted ? t(key) : (labelFallbacks[key] ?? key));
+
   return (
     <header className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
       scrolled ? "bg-black/80 backdrop-blur-md border-b border-white/5" : "bg-transparent"
@@ -97,7 +109,7 @@ export default function Navbar() {
                   rel="noopener noreferrer"
                   className="text-zinc-300 hover:text-white transition-colors duration-300 relative group"
                 >
-                  {t("common.home")}
+                  {navLabel("common.home")}
                   <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-400 to-cyan-300 transition-all duration-300 group-hover:w-full"></span>
                 </a>
               ) : (
@@ -108,7 +120,7 @@ export default function Navbar() {
                     active === l.id ? "text-white" : "text-zinc-300 hover:text-white"
                   }`}
                 >
-                  {t(l.labelKey)}
+                  {navLabel(l.labelKey)}
                   <span className={`absolute -bottom-1 left-0 h-0.5 bg-gradient-to-r from-blue-400 to-cyan-300 transition-all duration-300 ${
                     active === l.id ? "w-full" : "w-0 group-hover:w-full"
                   }`}></span>
@@ -137,7 +149,7 @@ export default function Navbar() {
                   onClick={() => router.push("/dashboard")} 
                   className="btn-primary rounded-xl px-4 py-2 md:px-6 md:py-3 font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-blue-500/25"
                 >
-                  {t("common.dashboard")}
+                  {navLabel("common.dashboard")}
                 </button>
               </div>
             ) : (
@@ -145,7 +157,7 @@ export default function Navbar() {
                 onClick={() => router.push("/login")} 
                 className="btn-primary rounded-xl px-4 py-2 md:px-6 md:py-3 font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-blue-500/25"
               >
-                {t("common.login")}
+                {navLabel("common.login")}
               </button>
             )}
           </nav>
@@ -171,7 +183,7 @@ export default function Navbar() {
                   rel="noopener noreferrer"
                   className="text-zinc-300 hover:text-white transition-all duration-300 py-2 px-3 rounded-lg hover:bg-white/5 flex items-center justify-between group"
                 >
-                  <span>{t("common.home")}</span>
+                  <span>{navLabel("common.home")}</span>
                   <div className="w-2 h-2 bg-blue-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 </a>
               ) : (
@@ -182,7 +194,7 @@ export default function Navbar() {
                     active === l.id ? "text-white bg-white/5" : ""
                   }`}
                 >
-                  <span>{t(l.labelKey)}</span>
+                  <span>{navLabel(l.labelKey)}</span>
                   <div className={`w-2 h-2 bg-blue-400 rounded-full transition-all duration-300 ${
                     active === l.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                   }`}></div>
@@ -212,7 +224,7 @@ export default function Navbar() {
                     }} 
                     className="btn-primary rounded-xl px-4 py-3 font-medium w-full transition-all duration-300 hover:scale-105"
                   >
-                    {t("common.dashboard")}
+                    {navLabel("common.dashboard")}
                   </button>
                 </>
               ) : (
@@ -223,7 +235,7 @@ export default function Navbar() {
                   }} 
                   className="btn-primary rounded-xl px-4 py-3 font-medium w-full transition-all duration-300 hover:scale-105"
                 >
-                  {t("common.login")}
+                  {navLabel("common.login")}
                 </button>
               )}
             </div>

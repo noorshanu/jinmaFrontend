@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { apiClient } from "@/lib/api";
+import { apiClient, type Login2FARequiredResponse } from "@/lib/api";
 
 // Helper function to generate random star data
 function generateStarData() {
@@ -30,6 +30,16 @@ export default function LoginPage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // 2FA step (after password login when 2FA is enabled)
+  const [step2FA, setStep2FA] = useState<{
+    tempToken: string;
+    methods: ("totp" | "email")[];
+    user: { id: string; email: string; firstName: string; lastName: string };
+  } | null>(null);
+  const [twoFAMethod, setTwoFAMethod] = useState<"totp" | "email">("totp");
+  const [twoFACode, setTwoFACode] = useState("");
+  const [twoFALoading, setTwoFALoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   useEffect(() => {
     // Generate random values only on client side after mount
@@ -37,6 +47,12 @@ export default function LoginPage() {
     setStars(Array.from({ length: 30 }, generateStarData));
     setIsMounted(true);
   }, []);
+
+  // When user chooses email 2FA, send OTP once
+  useEffect(() => {
+    if (!step2FA || twoFAMethod !== "email") return;
+    apiClient.send2FAEmailOTP(step2FA.tempToken).catch(() => {});
+  }, [step2FA?.tempToken, twoFAMethod]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,11 +64,20 @@ export default function LoginPage() {
         // Login
         const response = await apiClient.login(formData.email, formData.password);
         if (response.success && response.data) {
-          // Store token
-          localStorage.setItem("token", response.data.token);
-          localStorage.setItem("user", JSON.stringify(response.data.user));
-          // Redirect to dashboard
-          router.push("/dashboard");
+          const data = response.data as Login2FARequiredResponse | { token: string; user: unknown };
+          if ("requires2FA" in data && data.requires2FA && data.tempToken && data.methods?.length) {
+            setStep2FA({
+              tempToken: data.tempToken,
+              methods: data.methods,
+              user: data.user,
+            });
+            setTwoFAMethod(data.methods[0]);
+            setTwoFACode("");
+          } else if ("token" in data && data.token) {
+            localStorage.setItem("token", data.token);
+            localStorage.setItem("user", JSON.stringify(data.user));
+            router.push("/dashboard");
+          }
         }
       } else {
         // Signup - send OTP
@@ -92,6 +117,46 @@ export default function LoginPage() {
       ...formData,
       [e.target.name]: e.target.value,
     });
+    setError("");
+  };
+
+  const handleVerify2FA = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!step2FA || !twoFACode.trim()) return;
+    setError("");
+    setTwoFALoading(true);
+    try {
+      const response = await apiClient.verify2FA(step2FA.tempToken, twoFACode.trim(), twoFAMethod);
+      if (response.success && response.data && "token" in response.data) {
+        localStorage.setItem("token", response.data.token);
+        localStorage.setItem("user", JSON.stringify(response.data.user));
+        router.push("/dashboard");
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Invalid code. Please try again.");
+    } finally {
+      setTwoFALoading(false);
+    }
+  };
+
+  const handleResendEmailOTP = async () => {
+    if (!step2FA || twoFAMethod !== "email" || resendCooldown > 0) return;
+    setError("");
+    try {
+      await apiClient.send2FAEmailOTP(step2FA.tempToken);
+      setResendCooldown(60);
+      const interval = setInterval(() => {
+        setResendCooldown((prev) => (prev <= 1 ? 0 : prev - 1));
+        if (resendCooldown <= 1) clearInterval(interval);
+      }, 1000);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to resend code.");
+    }
+  };
+
+  const handleBackToLogin = () => {
+    setStep2FA(null);
+    setTwoFACode("");
     setError("");
   };
 
@@ -169,6 +234,83 @@ export default function LoginPage() {
             </motion.div>
           )}
 
+          {/* 2FA step */}
+          {step2FA ? (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-5"
+            >
+              <p className="text-zinc-300 text-sm">
+                Two-factor authentication is enabled. Enter the code from your {step2FA.methods.length > 1 ? "chosen method" : step2FA.methods[0] === "totp" ? "authenticator app" : "email"}.
+              </p>
+              {step2FA.methods.length > 1 && (
+                <div className="flex gap-2 p-2 bg-white/5 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setTwoFAMethod("totp")}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                      twoFAMethod === "totp" ? "bg-blue-500/20 text-blue-400" : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    Authenticator app
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTwoFAMethod("email")}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                      twoFAMethod === "email" ? "bg-blue-500/20 text-blue-400" : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    Send code to email
+                  </button>
+                </div>
+              )}
+              {twoFAMethod === "email" && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-zinc-400">Code sent to your email</span>
+                  <button
+                    type="button"
+                    onClick={handleResendEmailOTP}
+                    disabled={resendCooldown > 0}
+                    className="text-blue-400 hover:text-blue-300 disabled:text-zinc-500 disabled:cursor-not-allowed"
+                  >
+                    {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend code"}
+                  </button>
+                </div>
+              )}
+              <form onSubmit={handleVerify2FA} className="space-y-4">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={twoFACode}
+                  onChange={(e) => setTwoFACode(e.target.value.replace(/\D/g, ""))}
+                  placeholder="000000"
+                  disabled={twoFALoading}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-center text-xl tracking-[0.5em] placeholder-zinc-500 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleBackToLogin}
+                    className="flex-1 py-3 rounded-xl border border-white/20 text-zinc-300 hover:bg-white/5 transition-colors"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={twoFALoading || twoFACode.length !== 6}
+                    className="flex-1 btn-primary rounded-xl py-3 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {twoFALoading ? "Verifying..." : "Verify"}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          ) : (
+          <>
           {/* Toggle between Login and Signup */}
           <div className="flex gap-2 mb-6 bg-white/5 rounded-xl p-1">
             <button
@@ -345,6 +487,8 @@ export default function LoginPage() {
               {loading ? "Processing..." : isLogin ? "Sign In" : "Create Account"}
             </motion.button>
           </form>
+          </>
+          )}
 
           {/* Footer */}
           <motion.div

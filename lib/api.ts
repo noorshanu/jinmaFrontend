@@ -19,6 +19,26 @@ export interface LoginResponse {
   };
 }
 
+/** Login response when 2FA is required (no token until verify-2fa) */
+export interface Login2FARequiredResponse {
+  requires2FA: true;
+  tempToken: string;
+  methods: ('totp' | 'email')[];
+  user: LoginResponse['user'];
+}
+
+export interface TwoFAStatusResponse {
+  twoFactorEnabled: boolean;
+  twoFactorTotpEnabled: boolean;
+  twoFactorEmailEnabled: boolean;
+  methods: ('totp' | 'email')[];
+}
+
+export interface TOTPSetupResponse {
+  secret: string;
+  qrCode: string;
+}
+
 export interface UserProfileResponse {
   id: string;
   firstName: string;
@@ -440,10 +460,52 @@ class ApiClient {
     });
   }
 
-  async login(email: string, password: string): Promise<ApiResponse<LoginResponse>> {
-    return this.request<LoginResponse>('/auth/login', {
+  async login(email: string, password: string): Promise<ApiResponse<LoginResponse | Login2FARequiredResponse>> {
+    return this.request<LoginResponse | Login2FARequiredResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
+    });
+  }
+
+  async verify2FA(tempToken: string, code: string, method: 'totp' | 'email'): Promise<ApiResponse<LoginResponse>> {
+    return this.request<LoginResponse>('/auth/verify-2fa', {
+      method: 'POST',
+      body: JSON.stringify({ tempToken, code, method }),
+    });
+  }
+
+  async send2FAEmailOTP(tempToken: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>('/auth/2fa/send-email-otp', {
+      method: 'POST',
+      body: JSON.stringify({ tempToken }),
+    });
+  }
+
+  async get2FAStatus(): Promise<ApiResponse<TwoFAStatusResponse>> {
+    return this.request<TwoFAStatusResponse>('/auth/2fa/status');
+  }
+
+  async setupTOTP(): Promise<ApiResponse<TOTPSetupResponse>> {
+    return this.request<TOTPSetupResponse>('/auth/2fa/totp/setup');
+  }
+
+  async verifyTOTPSetup(code: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>('/auth/2fa/totp/verify-setup', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+  }
+
+  async enableEmail2FA(): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>('/auth/2fa/email/enable', {
+      method: 'POST',
+    });
+  }
+
+  async disable2FA(password: string, method?: 'totp' | 'email' | 'all'): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>('/auth/2fa/disable', {
+      method: 'POST',
+      body: JSON.stringify({ password, method: method ?? 'all' }),
     });
   }
 
@@ -640,6 +702,83 @@ class ApiClient {
   async getUserProfile(): Promise<ApiResponse<UserProfileResponse>> {
     return this.request<UserProfileResponse>('/user/profile');
   }
+
+  // Chat (1:1 with admin)
+  async getChatConversation(): Promise<
+    ApiResponse<{ id: string; user: string; adminParticipant: string | null; createdAt: string }>
+  > {
+    return this.request('/chat/conversation');
+  }
+
+  async getChatMessages(
+    conversationId: string,
+    opts?: { before?: string; limit?: number }
+  ): Promise<ApiResponse<{ messages: ChatMessage[] }>> {
+    const params = new URLSearchParams({ conversationId });
+    if (opts?.before) params.set('before', opts.before);
+    if (opts?.limit != null) params.set('limit', String(opts.limit));
+    return this.request<{ messages: ChatMessage[] }>(`/chat/messages?${params}`);
+  }
+
+  async sendChatMessage(
+    conversationId: string,
+    content: string,
+    opts?: { type?: 'text' | 'image'; attachment?: { url: string; publicId?: string; mimeType?: string; originalName?: string } }
+  ): Promise<ApiResponse<ChatMessage>> {
+    return this.request<ChatMessage>('/chat/messages', {
+      method: 'POST',
+      body: JSON.stringify({
+        conversationId,
+        content,
+        type: opts?.type ?? 'text',
+        attachment: opts?.attachment,
+      }),
+    });
+  }
+
+  async uploadChatImage(file: File): Promise<
+    ApiResponse<{ url: string; publicId: string; mimeType?: string; originalName?: string }>
+  > {
+    const url = `${this.baseUrl}/chat/upload`;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const formData = new FormData();
+    formData.append('file', file);
+    const config: RequestInit = {
+      method: 'POST',
+      body: formData,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    };
+    const response = await fetch(url, config);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Upload failed');
+    return data;
+  }
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  sender: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+  } | null;
+  type: 'text' | 'image' | 'video' | 'file' | 'cls_signal';
+  content: string;
+  attachment: { url: string; publicId?: string; mimeType?: string; originalName?: string } | null;
+  signal: {
+    id: string;
+    title: string;
+    commitPercent: number;
+    outcomeType: string;
+    profitMinPercent?: number;
+    profitMaxPercent?: number;
+    expiresAt: string;
+    status: string;
+  } | null;
+  createdAt: string;
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);

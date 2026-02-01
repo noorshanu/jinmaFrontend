@@ -1,0 +1,63 @@
+{
+  "common": {
+    "home": "Accueil",
+    "login": "Connexion",
+    "register": "S'inscrire",
+    "logout": "Déconnexion",
+    "dashboard": "Tableau de bord",
+    "signals": "Signaux",
+    "trade": "Trade",
+    "referrals": "Parrainages",
+    "grades": "Niveaux",
+    "settings": "Paramètres",
+    "wallet": "Portefeuille",
+    "deposit": "Dépôt",
+    "withdraw": "Retrait",
+    "transfer": "Transfert",
+    "user": "Utilisateur",
+    "language": "Langue"
+  },
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "signals": "Signaux",
+    "trade": "Trade",
+    "referrals": "Parrainages",
+    "grades": "Niveaux",
+    "settings": "Paramètres"
+  },
+  "auth": {
+    "login": "Connexion",
+    "register": "S'inscrire",
+    "email": "E-mail",
+    "password": "Mot de passe",
+    "forgotPassword": "Mot de passe oublié ?",
+    "noAccount": "Pas de compte ?",
+    "hasAccount": "Déjà un compte ?"
+  },
+  "dashboard": {
+    "welcome": "Tableau de bord",
+    "balance": "Solde",
+    "recentActivity": "Activité récente",
+    "signalsToUse": "Signaux à utiliser",
+    "tradeHistory": "Historique des trades"
+  },
+  "signals": {
+    "title": "Signaux de trading",
+    "daily": "Quotidien",
+    "referral": "Parrainage",
+    "welcome": "Bienvenue",
+    "welcomeFromAdmin": "Bonus de bienvenue (admin)",
+    "tradeNow": "Trader maintenant",
+    "history": "Historique"
+  },
+  "trade": {
+    "title": "Trade",
+    "use": "Utiliser",
+    "confirmTrade": "Confirmer le trade",
+    "tradeInProgress": "Trade en cours",
+    "resultOnTheWay": "Résultat en cours...",
+    "tradeCompleted": "Trade terminé",
+    "win": "GAIN !",
+    "loss": "PERTE"
+  }
+}

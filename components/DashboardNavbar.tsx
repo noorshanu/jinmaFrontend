@@ -12,6 +12,7 @@ import {
   LuTrendingUp, 
   LuUsers, 
   LuStar,
+  LuMessageCircle,
   LuSettings,
   LuLogOut,
   LuChevronDown
@@ -31,6 +32,7 @@ const navFallbacks: Record<string, string> = {
   "nav.dashboard": "Dashboard",
   "nav.signals": "Signals",
   "nav.trade": "Trade",
+  "nav.chat": "Chat",
   "nav.referrals": "Referrals",
   "nav.grades": "Grades",
   "nav.settings": "Settings",
@@ -200,6 +202,14 @@ export default function DashboardNavbar() {
                       >
                         <LuSettings size={16} />
                         <span>{mounted ? t("common.settings") : navFallbacks["common.settings"]}</span>
+                      </Link>
+                      <Link
+                        href="/dashboard/chat"
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg text-zinc-300 hover:text-white hover:bg-white/5 transition-all duration-300 text-sm"
+                        onClick={() => setProfileDropdown(false)}
+                      >
+                        <LuMessageCircle size={16} />
+                        <span>{navLabel("nav.chat")}</span>
                       </Link>
                       <Link
                         href="/dashboard/wallet"

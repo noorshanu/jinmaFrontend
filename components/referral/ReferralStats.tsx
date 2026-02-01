@@ -11,11 +11,16 @@ interface ReferralStatsProps {
 }
 
 export default function ReferralStats({
-  referralEarnings,
-  totalReferrals,
-  activeReferrals,
-  bonusPercent,
+  referralEarnings = 0,
+  totalReferrals = 0,
+  activeReferrals = 0,
+  bonusPercent = 10,
 }: ReferralStatsProps) {
+  const earnings = Number(referralEarnings) || 0;
+  const total = Number(totalReferrals) || 0;
+  const active = Number(activeReferrals) || 0;
+  const percent = Number(bonusPercent) || 10;
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       <motion.div
@@ -31,9 +36,9 @@ export default function ReferralStats({
           <span className="text-xs text-zinc-400">Total Earnings</span>
         </div>
         <h3 className="text-3xl font-bold text-white mb-1">
-          ${referralEarnings.toFixed(2)}
+          ${earnings.toFixed(2)}
         </h3>
-        <p className="text-sm text-zinc-400">From {totalReferrals} referrals</p>
+        <p className="text-sm text-zinc-400">From {total} activated referral{total !== 1 ? "s" : ""}</p>
       </motion.div>
 
       <motion.div
@@ -46,10 +51,10 @@ export default function ReferralStats({
           <div className="p-3 bg-green-500/20 rounded-xl">
             <LuUsers className="w-6 h-6 text-green-400" />
           </div>
-          <span className="text-xs text-zinc-400">Total Referrals</span>
+          <span className="text-xs text-zinc-400">Activated Referrals</span>
         </div>
-        <h3 className="text-3xl font-bold text-white mb-1">{totalReferrals}</h3>
-        <p className="text-sm text-zinc-400">{activeReferrals} active traders</p>
+        <h3 className="text-3xl font-bold text-white mb-1">{total}</h3>
+        <p className="text-sm text-zinc-400">{active} active traders (earned you bonus)</p>
       </motion.div>
 
       <motion.div
@@ -64,7 +69,7 @@ export default function ReferralStats({
           </div>
           <span className="text-xs text-zinc-400">Bonus Rate</span>
         </div>
-        <h3 className="text-3xl font-bold text-white mb-1">{bonusPercent}%</h3>
+        <h3 className="text-3xl font-bold text-white mb-1">{percent}%</h3>
         <p className="text-sm text-zinc-400">On trading activation</p>
       </motion.div>
     </div>

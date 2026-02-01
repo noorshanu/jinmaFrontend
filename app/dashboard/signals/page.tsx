@@ -410,7 +410,7 @@ export default function SignalsPage() {
             >
               CORE SIGNALS ({dailySignals.length})
             </button>
-            {limits !== null && limits.referralSignalsRemaining > 0 && (
+            {limits !== null && limits.maxReferralSignals > 0 && (
             <button
               onClick={() => setActiveTab("referral")}
               className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${
