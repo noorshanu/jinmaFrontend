@@ -711,9 +711,25 @@ class ApiClient {
   }
 
   async getGroupConversation(): Promise<
-    ApiResponse<{ id: string; type: string; user: null; adminParticipant: null; createdAt: string }>
+    ApiResponse<{ id: string; type: string; user: null; adminParticipant: null; createdAt: string; groupChatEnabled?: boolean }>
   > {
     return this.request('/chat/group/conversation');
+  }
+
+  /** Unread counts; pass lastSeenGroup/lastSeenPrivate as ISO strings from localStorage to count messages after that time */
+  async getChatUnread(params?: {
+    lastSeenGroup?: string;
+    lastSeenPrivate?: string;
+  }): Promise<
+    ApiResponse<{ unreadGroup: number; unreadPrivate: number; total: number }>
+  > {
+    const sp = new URLSearchParams();
+    if (params?.lastSeenGroup) sp.set('lastSeenGroup', params.lastSeenGroup);
+    if (params?.lastSeenPrivate) sp.set('lastSeenPrivate', params.lastSeenPrivate);
+    const q = sp.toString();
+    return this.request<{ unreadGroup: number; unreadPrivate: number; total: number }>(
+      q ? `/chat/unread?${q}` : '/chat/unread'
+    );
   }
 
   async getChatMessages(
@@ -742,6 +758,34 @@ class ApiClient {
     });
   }
 
+  // Notifications (internal, no email)
+  async getNotifications(page = 1, limit = 20): Promise<
+    ApiResponse<{
+      notifications: NotificationItem[];
+      total: number;
+      unreadCount: number;
+      page: number;
+      limit: number;
+    }>
+  > {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    return this.request<{
+      notifications: NotificationItem[];
+      total: number;
+      unreadCount: number;
+      page: number;
+      limit: number;
+    }>(`/notifications?${params}`);
+  }
+
+  async markNotificationRead(id: string): Promise<ApiResponse<NotificationItem>> {
+    return this.request<NotificationItem>(`/notifications/${id}/read`, { method: 'PATCH' });
+  }
+
+  async markAllNotificationsRead(): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>('/notifications/read-all', { method: 'PATCH' });
+  }
+
   async uploadChatImage(file: File): Promise<
     ApiResponse<{ url: string; publicId: string; mimeType?: string; originalName?: string }>
   > {
@@ -759,6 +803,17 @@ class ApiClient {
     if (!response.ok) throw new Error(data.message || 'Upload failed');
     return data;
   }
+}
+
+export interface NotificationItem {
+  _id: string;
+  user: string;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  data?: Record<string, unknown>;
+  createdAt: string;
 }
 
 export interface ChatMessage {

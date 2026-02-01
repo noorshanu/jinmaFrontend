@@ -54,7 +54,7 @@ export default function LanguageSwitcher() {
       </button>
       {open && (
         <div
-          className="absolute right-0 top-full mt-1 min-w-[160px] rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur py-1 shadow-xl z-50"
+          className="absolute left-1 bottom-full mb-1 min-w-[160px] rounded-xl border border-white/10 bg-zinc-900/95 backdrop-blur py-1 shadow-xl z-50"
           role="menu"
         >
           {supportedLanguages.map((lang) => (

@@ -13,11 +13,13 @@ import {
   LuUsers, 
   LuStar,
   LuMessageCircle,
+  LuBell,
   LuSettings,
   LuLogOut,
   LuChevronDown
 } from "react-icons/lu";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
+import NotificationDropdown from "@/components/NotificationDropdown";
+import useChatUnread from "@/hooks/useChatUnread";
 
 const navLinks = [
   { href: "/dashboard", labelKey: "nav.dashboard", icon: LuLayoutDashboard },
@@ -35,6 +37,7 @@ const navFallbacks: Record<string, string> = {
   "nav.chat": "Chat",
   "nav.referrals": "Referrals",
   "nav.grades": "Grades",
+  "nav.notifications": "Notifications",
   "nav.settings": "Settings",
   "common.settings": "Settings",
   "common.wallet": "Wallet",
@@ -73,6 +76,7 @@ export default function DashboardNavbar() {
   const pathname = usePathname();
   const router = useRouter();
   const didLoad = useRef(false);
+  const { total: chatUnreadTotal } = useChatUnread();
 
   useEffect(() => {
     setMounted(true);
@@ -149,38 +153,37 @@ export default function DashboardNavbar() {
                 </Link>
               );
             })}
-            <LanguageSwitcher />
-          </div>
-
-          {/* Profile Section */}
-          <div className="relative">
-            <button
-              onClick={() => setProfileDropdown(!profileDropdown)}
-              onMouseEnter={() => setProfileDropdown(true)}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-all duration-300"
-            >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center">
-                <span className="text-white text-sm font-semibold">
-                  {initials}
-                </span>
-              </div>
-              <span className="text-white font-medium text-sm hidden sm:block">
-                {displayName}
-              </span>
-              <LuChevronDown
-                className={`w-4 h-4 text-zinc-400 transition-transform duration-300 ${
-                  profileDropdown ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-
-            {/* Profile Dropdown */}
-            <AnimatePresence>
-              {profileDropdown && (
-                <div
-                  onMouseLeave={() => setProfileDropdown(false)}
-                  className="absolute right-0 mt-2 w-48"
+            {/* Notification bell + User avatar (combined, no username) */}
+            <div className="flex items-center gap-2 ml-1">
+              <NotificationDropdown />
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setProfileDropdown(!profileDropdown)}
+                  onMouseEnter={() => setProfileDropdown(true)}
+                  className="relative w-9 h-9 rounded-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-cyan-400 hover:ring-2 hover:ring-white/20 transition-all duration-300"
+                  aria-label="Profile menu"
                 >
+                  <span className="text-white text-sm font-semibold uppercase">
+                    {initials}
+                  </span>
+                  {/* Chevron overlay bottom-right (like image reference) */}
+                  <span
+                    className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-zinc-700 flex items-center justify-center border border-zinc-600 transition-transform duration-200 ${
+                      profileDropdown ? "rotate-180" : ""
+                    }`}
+                  >
+                    <LuChevronDown className="w-2.5 h-2.5 text-white" />
+                  </span>
+                </button>
+
+                {/* Profile Dropdown */}
+                <AnimatePresence>
+                  {profileDropdown && (
+                    <div
+                      onMouseLeave={() => setProfileDropdown(false)}
+                      className="absolute right-0 mt-2 w-48"
+                    >
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -205,11 +208,16 @@ export default function DashboardNavbar() {
                       </Link>
                       <Link
                         href="/dashboard/chat"
-                        className="flex items-center gap-3 px-3 py-2 rounded-lg text-zinc-300 hover:text-white hover:bg-white/5 transition-all duration-300 text-sm"
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg text-zinc-300 hover:text-white hover:bg-white/5 transition-all duration-300 text-sm relative"
                         onClick={() => setProfileDropdown(false)}
                       >
                         <LuMessageCircle size={16} />
-                        <span>{navLabel("nav.chat")}</span>
+                        <span>{navLabel("Chat")}</span>
+                        {chatUnreadTotal > 0 && (
+                          <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                            {chatUnreadTotal > 99 ? "99+" : chatUnreadTotal}
+                          </span>
+                        )}
                       </Link>
                       <Link
                         href="/dashboard/wallet"
@@ -239,6 +247,8 @@ export default function DashboardNavbar() {
                 </div>
               )}
             </AnimatePresence>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -266,8 +276,8 @@ export default function DashboardNavbar() {
               </Link>
             );
           })}
-          <div className="flex justify-center py-2">
-            <LanguageSwitcher />
+          <div className="flex items-center justify-center gap-2 py-2">
+            <NotificationDropdown />
           </div>
         </div>
       </div>
