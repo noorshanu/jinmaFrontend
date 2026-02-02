@@ -135,7 +135,9 @@ export default function ChatPage() {
   useEffect(() => {
     setHasMoreOlder(true);
     if (tab === "group") {
-      fetchGroupConversation().then((id) => id && fetchMessages(id));
+      fetchGroupConversation().then((id) => {
+        if (id) fetchMessages(id);
+      });
     } else if (privateConvId) {
       fetchMessages(privateConvId);
     }
