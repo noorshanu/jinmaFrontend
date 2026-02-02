@@ -48,6 +48,7 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scrollToBottomNextRef = useRef(false);
   const currentConvId = tab === "group" ? groupConvId : privateConvId;
   const LOAD_OLDER_LIMIT = 50;
 
@@ -115,6 +116,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     let mounted = true;
+    scrollToBottomNextRef.current = true;
     const init = async () => {
       setLoading(true);
       setError(null);
@@ -134,6 +136,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     setHasMoreOlder(true);
+    scrollToBottomNextRef.current = true;
     if (tab === "group") {
       fetchGroupConversation().then((id) => {
         if (id) fetchMessages(id);
@@ -150,7 +153,10 @@ export default function ChatPage() {
   }, [currentConvId, fetchMessages]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (scrollToBottomNextRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      scrollToBottomNextRef.current = false;
+    }
   }, [messages]);
 
   const handleTabChange = (t: Tab) => {
@@ -180,6 +186,7 @@ export default function ChatPage() {
         setMessages((prev) => [...prev, res.data!]);
         setContent("");
         if (typeof window !== "undefined") localStorage.setItem(getDraftKey(tab), "");
+        scrollToBottomNextRef.current = true;
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to send");
@@ -217,6 +224,7 @@ export default function ChatPage() {
       if (sendRes.success && sendRes.data) {
         setMessages((prev) => [...prev, sendRes.data!]);
         setContent("");
+        scrollToBottomNextRef.current = true;
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload or send failed");
