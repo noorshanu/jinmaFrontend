@@ -8,6 +8,7 @@ import { LuMessageCircle } from "react-icons/lu";
 import TradingNotActivatedNotice from "@/components/TradingNotActivatedNotice";
 import { apiClient } from "@/lib/api";
 import { useChatUnread } from "@/hooks/useChatUnread";
+import { runCacheVersionCheck } from "@/lib/cacheVersion";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import DashboardErrorBoundary from "@/components/DashboardErrorBoundary";
 
@@ -27,6 +28,11 @@ export default function DashboardLayout({
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  // One-time cache clear when app version changes (users get fresh UI)
+  useEffect(() => {
+    runCacheVersionCheck();
   }, []);
 
   useEffect(() => {
