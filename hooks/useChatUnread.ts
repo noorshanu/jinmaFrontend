@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { apiClient } from "@/lib/api";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { apiClient, isRateLimitError } from "@/lib/api";
 
 const STORAGE_LAST_SEEN_GROUP = "chatLastSeenGroup";
 const STORAGE_LAST_SEEN_PRIVATE = "chatLastSeenPrivate";
 const POLL_INTERVAL_MS = 15000;
+const POLL_INTERVAL_BACKOFF_MS = 30000;
 
 /** Dispatch this after updating lastSeen so badge refreshes immediately */
 export const CHAT_LAST_SEEN_UPDATED = "chatLastSeenUpdated";
@@ -42,20 +43,21 @@ export function useChatUnread(): {
   const [unreadGroup, setUnreadGroup] = useState(0);
   const [unreadPrivate, setUnreadPrivate] = useState(0);
   const [loading, setLoading] = useState(true);
+  const backoffPollsLeft = useRef(0);
 
   const fetchUnread = useCallback(async () => {
     try {
       const { lastSeenGroup, lastSeenPrivate } = getChatLastSeenFromStorage();
       const res = await apiClient.getChatUnread({ lastSeenGroup, lastSeenPrivate });
       if (res.success && res.data) {
+        if (backoffPollsLeft.current > 0) backoffPollsLeft.current--;
         setTotal(res.data.total);
         setUnreadGroup(res.data.unreadGroup);
         setUnreadPrivate(res.data.unreadPrivate);
       }
-    } catch {
-      setTotal(0);
-      setUnreadGroup(0);
-      setUnreadPrivate(0);
+    } catch (e) {
+      if (isRateLimitError(e)) backoffPollsLeft.current = 2;
+      // Keep previous counts on error (don't zero out – 429 shouldn't show "no unread")
     } finally {
       setLoading(false);
     }
@@ -63,11 +65,20 @@ export function useChatUnread(): {
 
   useEffect(() => {
     fetchUnread();
-    const interval = setInterval(fetchUnread, POLL_INTERVAL_MS);
+    const getInterval = () =>
+      backoffPollsLeft.current > 0 ? POLL_INTERVAL_BACKOFF_MS : POLL_INTERVAL_MS;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      timeoutId = setTimeout(() => {
+        fetchUnread();
+        schedule();
+      }, getInterval());
+    };
+    schedule();
     const onUpdated = () => { fetchUnread(); };
     window.addEventListener(CHAT_LAST_SEEN_UPDATED, onUpdated);
     return () => {
-      clearInterval(interval);
+      clearTimeout(timeoutId);
       window.removeEventListener(CHAT_LAST_SEEN_UPDATED, onUpdated);
     };
   }, [fetchUnread]);

@@ -49,6 +49,7 @@ export default function WalletPage() {
   const [transferSuccess, setTransferSuccess] = useState("");
 
   const fetchData = useCallback(async () => {
+    setError("");
     try {
       const [walletRes, transfersRes, activityRes] = await Promise.all([
         apiClient.getWallet(),
@@ -206,8 +207,16 @@ export default function WalletPage() {
           </motion.div>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400">
-              {error}
+            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex flex-wrap items-center justify-between gap-3">
+              <p className="text-red-400 text-sm">{error}</p>
+              <button
+                type="button"
+                onClick={() => { setError(""); setLoading(true); fetchData(); }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors text-sm font-medium"
+              >
+                <LuRefreshCw size={16} />
+                Retry
+              </button>
             </div>
           )}
 

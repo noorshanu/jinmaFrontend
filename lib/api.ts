@@ -1,5 +1,18 @@
 const API_BASE_URL = 'https://api.jinma.tech/api';
 
+/** Use when handling errors to back off or retry on rate limit */
+export function isRateLimitError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  return err.message.includes('Too many requests');
+}
+
+/** Use for GET retry: 429, 503, or network failure */
+export function isRetryableError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const m = err.message;
+  return m.includes('Too many requests') || m.includes('temporarily unavailable') || m === 'Failed to fetch' || m.includes('NetworkError');
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   message: string;
@@ -406,20 +419,26 @@ class ApiClient {
 
     try {
       const response = await fetch(url, config);
-      const data = await response.json();
+      let data: ApiResponse<T> | null = null;
+      const text = await response.text();
+      try {
+        data = text ? (JSON.parse(text) as ApiResponse<T>) : null;
+      } catch {
+        // Non-JSON body (e.g. proxy HTML for 429)
+        data = null;
+      }
 
       if (!response.ok) {
-        // Handle rate limiting – throw with a known message so callers can retry quietly
         if (response.status === 429) {
           throw new Error('Too many requests. Please wait a moment and try again.');
         }
-        throw new Error(data.message || 'An error occurred');
+        const message = data && typeof data === 'object' && typeof data.message === 'string' ? data.message : 'An error occurred';
+        throw new Error(message);
       }
 
-      return data;
+      return (data ?? { success: true, message: '' }) as ApiResponse<T>;
     } catch (error) {
       if (error instanceof Error) {
-        // Don't log to console: 429 (rate limit) or Failed to fetch (network) – callers handle retry
         const msg = error.message;
         const isRateLimit = msg.includes('Too many requests');
         const isNetworkError = msg === 'Failed to fetch' || msg.includes('NetworkError');
@@ -530,9 +549,17 @@ class ApiClient {
     });
   }
 
-  // Wallet endpoints
+  // Wallet endpoints (single retry on 429/503/network to reduce "wallet balance error" on transient rate limit)
   async getWallet(): Promise<ApiResponse<WalletResponse>> {
-    return this.request<WalletResponse>('/wallet');
+    try {
+      return await this.request<WalletResponse>('/wallet');
+    } catch (err) {
+      if (isRetryableError(err)) {
+        await new Promise((r) => setTimeout(r, 2500));
+        return await this.request<WalletResponse>('/wallet');
+      }
+      throw err;
+    }
   }
 
   async getPlatformWallet(): Promise<ApiResponse<PlatformWalletResponse>> {

@@ -5,11 +5,12 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import DashboardNavbar from "@/components/DashboardNavbar";
 import DashboardFooter from "@/components/DashboardFooter";
-import { apiClient, ChatMessage } from "@/lib/api";
+import { apiClient, ChatMessage, isRateLimitError } from "@/lib/api";
 import { setChatLastSeenGroup, setChatLastSeenPrivate, CHAT_LAST_SEEN_UPDATED } from "@/hooks/useChatUnread";
 import { LuRefreshCw, LuSend, LuMessageCircle, LuImage, LuUser, LuUsers, LuHeadphones, LuReply, LuX } from "react-icons/lu";
 
 const POLL_INTERVAL_MS = 6000;
+const POLL_INTERVAL_BACKOFF_MS = 25000;
 const DRAFT_DEBOUNCE_MS = 400;
 const DRAFT_KEY_GROUP = "chatDraftGroup";
 const DRAFT_KEY_PRIVATE = "chatDraftPrivate";
@@ -45,6 +46,7 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rateLimited, setRateLimited] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -69,6 +71,7 @@ export default function ChatPage() {
         return res.data.id;
       }
     } catch (e) {
+      if (isRateLimitError(e)) setRateLimited(true);
       setError(e instanceof Error ? e.message : "Failed to load group chat");
     }
     return null;
@@ -82,6 +85,7 @@ export default function ChatPage() {
         return res.data.id;
       }
     } catch (e) {
+      if (isRateLimitError(e)) setRateLimited(true);
       setError(e instanceof Error ? e.message : "Failed to load support chat");
     }
     return null;
@@ -95,6 +99,7 @@ export default function ChatPage() {
       const limit = appendOlder ? LOAD_OLDER_LIMIT : 100;
       const res = await apiClient.getChatMessages(convId, { before, limit });
       if (res.success && res.data?.messages) {
+        setRateLimited(false);
         if (appendOlder) {
           if (res.data.messages.length < limit) setHasMoreOlder(false);
           setMessages((prev) => {
@@ -108,6 +113,7 @@ export default function ChatPage() {
         }
       }
     } catch (e) {
+      if (isRateLimitError(e)) setRateLimited(true);
       setError(e instanceof Error ? e.message : "Failed to load messages");
     } finally {
       if (appendOlder) setLoadingOlder(false);
@@ -148,9 +154,10 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!currentConvId) return;
-    const interval = setInterval(() => fetchMessages(currentConvId), POLL_INTERVAL_MS);
+    const intervalMs = rateLimited ? POLL_INTERVAL_BACKOFF_MS : POLL_INTERVAL_MS;
+    const interval = setInterval(() => fetchMessages(currentConvId), intervalMs);
     return () => clearInterval(interval);
-  }, [currentConvId, fetchMessages]);
+  }, [currentConvId, fetchMessages, rateLimited]);
 
   useEffect(() => {
     if (scrollToBottomNextRef.current) {
@@ -336,6 +343,13 @@ export default function ChatPage() {
                 </p>
               </div>
             </div>
+
+            {rateLimited && (
+              <div className="px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 flex items-center gap-2 text-amber-200 text-sm">
+                <LuRefreshCw className="w-4 h-4 shrink-0" />
+                <span>Updates paused – too many requests. Resuming shortly.</span>
+              </div>
+            )}
 
             <div
               ref={scrollContainerRef}

@@ -4,9 +4,11 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { LuBell, LuCheck, LuChevronRight } from "react-icons/lu";
-import { apiClient, type NotificationItem } from "@/lib/api";
+import { apiClient, type NotificationItem, isRateLimitError } from "@/lib/api";
 
 const DROPDOWN_LIMIT = 10;
+const POLL_INTERVAL_MS = 60000;
+const POLL_INTERVAL_BACKOFF_MS = 90000;
 
 function formatTime(iso: string) {
   try {
@@ -33,6 +35,7 @@ export default function NotificationDropdown() {
   const [loading, setLoading] = useState(false);
   const [markingId, setMarkingId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const useBackoffRef = useRef(false);
 
   const fetchNotifications = async () => {
     if (typeof window === "undefined") return;
@@ -40,11 +43,13 @@ export default function NotificationDropdown() {
     try {
       const res = await apiClient.getNotifications(1, DROPDOWN_LIMIT);
       if (res.success && res.data) {
+        useBackoffRef.current = false;
         setNotifications(res.data.notifications);
         setUnreadCount(res.data.unreadCount);
       }
-    } catch {
-      // ignore
+    } catch (e) {
+      if (isRateLimitError(e)) useBackoffRef.current = true;
+      // Keep previous notifications and unreadCount on error
     } finally {
       setLoading(false);
     }
@@ -52,8 +57,16 @@ export default function NotificationDropdown() {
 
   useEffect(() => {
     fetchNotifications();
-    const t = setInterval(fetchNotifications, 60000);
-    return () => clearInterval(t);
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      const delay = useBackoffRef.current ? POLL_INTERVAL_BACKOFF_MS : POLL_INTERVAL_MS;
+      timeoutId = setTimeout(() => {
+        fetchNotifications();
+        schedule();
+      }, delay);
+    };
+    schedule();
+    return () => clearTimeout(timeoutId);
   }, []);
 
   useEffect(() => {

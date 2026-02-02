@@ -16,7 +16,8 @@ import {
   LuClock,
   LuBan,
   LuInbox,
-  LuLock
+  LuLock,
+  LuRefreshCw
 } from "react-icons/lu";
 import DashboardFooter from "@/components/DashboardFooter";
 
@@ -33,6 +34,7 @@ interface Activity {
 export default function DashboardPage() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [recentActivity, setRecentActivity] = useState<Activity[]>([]);
   const [lockCountdown, setLockCountdown] = useState<string>("");
 
@@ -49,56 +51,56 @@ export default function DashboardPage() {
     return `${hours}h`;
   }, []);
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        // Fetch wallet balances
-        const walletRes = await apiClient.getWallet();
-        if (walletRes.success && walletRes.data) {
-          setWallet(walletRes.data.wallet);
-        }
+  const loadData = useCallback(async () => {
+    setLoadError(null);
+    setLoading(true);
+    try {
+      const walletRes = await apiClient.getWallet();
+      if (walletRes.success && walletRes.data) {
+        setWallet(walletRes.data.wallet);
+      }
 
-        // Fetch unified wallet activity (deposits, transfers, admin credits e.g. "$200 sent by JinmaAdmin")
-        const activityRes = await apiClient.getWalletActivity(1, 8);
-        if (activityRes.success && activityRes.data) {
-          const activities: Activity[] = activityRes.data.activities.slice(0, 6).map((a) => {
-            if (a.type === "admin_credit") {
-              return {
-                id: a.id,
-                type: a.description,
-                amount: `+$${a.amount.toFixed(2)}`,
-                time: formatTimeAgo(a.createdAt),
-                status: "deposit" as const
-              };
-            }
-            if (a.type === "deposit") {
-              return {
-                id: a.id,
-                type: "Deposit Approved",
-                amount: `+$${a.amount.toFixed(2)}`,
-                time: formatTimeAgo(a.createdAt),
-                status: "deposit" as const
-              };
-            }
+      const activityRes = await apiClient.getWalletActivity(1, 8);
+      if (activityRes.success && activityRes.data) {
+        const activities: Activity[] = activityRes.data.activities.slice(0, 6).map((a) => {
+          if (a.type === "admin_credit") {
             return {
               id: a.id,
               type: a.description,
-              amount: `$${a.amount.toFixed(2)}`,
+              amount: `+$${a.amount.toFixed(2)}`,
               time: formatTimeAgo(a.createdAt),
-              status: "transfer" as const
+              status: "deposit" as const
             };
-          });
-          setRecentActivity(activities);
-        }
-      } catch (err) {
-        console.error("Failed to fetch wallet data:", err);
-      } finally {
-        setLoading(false);
+          }
+          if (a.type === "deposit") {
+            return {
+              id: a.id,
+              type: "Deposit Approved",
+              amount: `+$${a.amount.toFixed(2)}`,
+              time: formatTimeAgo(a.createdAt),
+              status: "deposit" as const
+            };
+          }
+          return {
+            id: a.id,
+            type: a.description,
+            amount: `$${a.amount.toFixed(2)}`,
+            time: formatTimeAgo(a.createdAt),
+            status: "transfer" as const
+          };
+        });
+        setRecentActivity(activities);
       }
-    };
-    
-    loadData();
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Couldn't load balance. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Update lock countdown
   useEffect(() => {
@@ -170,6 +172,24 @@ export default function DashboardPage() {
             </h1>
             <p className="text-zinc-400">Manage your accounts and track your activity</p>
           </motion.div>
+
+          {loadError && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex flex-wrap items-center justify-between gap-3"
+            >
+              <p className="text-amber-200 text-sm">{loadError}</p>
+              <button
+                type="button"
+                onClick={() => loadData()}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 transition-colors text-sm font-medium"
+              >
+                <LuRefreshCw size={16} />
+                Retry
+              </button>
+            </motion.div>
+          )}
 
           {/* Account Cards */}
           <div className="grid md:grid-cols-2 gap-6 mb-8">
