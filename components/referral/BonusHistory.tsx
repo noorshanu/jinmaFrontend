@@ -23,7 +23,8 @@ export default function BonusHistory({ bonuses }: BonusHistoryProps) {
       month: "short",
       day: "numeric",
       year: "numeric",
-    });
+      timeZone: "UTC",
+    }) + " UTC";
   };
 
   // First name only from full name

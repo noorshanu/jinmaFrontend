@@ -167,8 +167,9 @@ export default function WalletPage() {
       month: "short",
       day: "numeric",
       hour: "2-digit",
-      minute: "2-digit"
-    });
+      minute: "2-digit",
+      timeZone: "UTC",
+    }) + " UTC";
   };
 
   if (loading) {
@@ -325,7 +326,7 @@ export default function WalletPage() {
               {wallet.transferLock.isLocked && wallet.transferLock.lockEndsAt && (
                 <div className="mt-3 pt-3 border-t border-white/10">
                   <p className="text-xs text-zinc-500">
-                    🔓 Unlocks on: {new Date(wallet.transferLock.lockEndsAt).toLocaleString()}
+                    🔓 Unlocks on: {new Date(wallet.transferLock.lockEndsAt).toLocaleString("en-US", { timeZone: "UTC", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} UTC
                   </p>
                 </div>
               )}
@@ -608,7 +609,7 @@ export default function WalletPage() {
                       <span>Transfer Lock: {lockCountdown} remaining</span>
                     </div>
                     <p className="text-yellow-500/70 text-xs">
-                      Movement → Main transfers are locked until {wallet.transferLock.lockEndsAt && new Date(wallet.transferLock.lockEndsAt).toLocaleDateString()}
+                      Movement → Main transfers are locked until {wallet.transferLock.lockEndsAt && new Date(wallet.transferLock.lockEndsAt).toLocaleDateString("en-US", { timeZone: "UTC" })} UTC
                     </p>
                   </div>
                 )}

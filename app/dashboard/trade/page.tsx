@@ -161,7 +161,8 @@ function TradeContent() {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const formatDate = (dateStr: string) => new Date(dateStr).toLocaleString();
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleString("en-US", { timeZone: "UTC", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) + " UTC";
 
   // Fetch wallet & profile
   useEffect(() => {

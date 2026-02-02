@@ -15,9 +15,13 @@ function formatDate(iso: string) {
     const today = now.toDateString();
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
-    if (d.toDateString() === today) return `Today ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-    if (d.toDateString() === yesterday.toDateString()) return `Yesterday ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-    return d.toLocaleString();
+    const utcDateStr = d.toLocaleDateString("en-US", { timeZone: "UTC" });
+    const todayUTC = now.toLocaleDateString("en-US", { timeZone: "UTC" });
+    const yesterdayUTC = new Date(now.getTime() - 864e5).toLocaleDateString("en-US", { timeZone: "UTC" });
+    const timeUTC = d.toLocaleTimeString("en-US", { timeZone: "UTC", hour: "2-digit", minute: "2-digit" });
+    if (utcDateStr === todayUTC) return `Today ${timeUTC} UTC`;
+    if (utcDateStr === yesterdayUTC) return `Yesterday ${timeUTC} UTC`;
+    return d.toLocaleString("en-US", { timeZone: "UTC", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) + " UTC";
   } catch {
     return iso;
   }

@@ -254,7 +254,7 @@ export default function TransferPage() {
                   <strong>{formatTimeRemaining(wallet.transferLock.lockRemainingMs)}</strong>.
                   {wallet.transferLock.lockEndsAt && (
                     <span className="block mt-1">
-                      Lock ends: {new Date(wallet.transferLock.lockEndsAt).toLocaleString()}
+                      Lock ends: {new Date(wallet.transferLock.lockEndsAt).toLocaleString("en-US", { timeZone: "UTC", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} UTC
                     </span>
                   )}
                 </p>

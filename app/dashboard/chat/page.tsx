@@ -506,7 +506,7 @@ export default function ChatPage() {
                         <p className="text-white text-sm mt-1">{m.signal.title}</p>
                         <p className="text-zinc-400 text-xs mt-1">
                           Commit {m.signal.commitPercent}% • Outcome: {m.signal.outcomeType} • Expires:{" "}
-                          {new Date(m.signal.expiresAt).toLocaleString()}
+                          {new Date(m.signal.expiresAt).toLocaleString("en-US", { timeZone: "UTC", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} UTC
                         </p>
                         {m.signal.status === "ACTIVE" && (
                           <Link
@@ -520,7 +520,7 @@ export default function ChatPage() {
                     )}
                     {(m.content && m.type !== "text") && <p className="text-white text-sm mt-2">{m.content}</p>}
                     <p className="text-xs text-zinc-500 mt-2">
-                      {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(m.createdAt).toLocaleTimeString("en-US", { timeZone: "UTC", hour: "2-digit", minute: "2-digit" })} UTC
                     </p>
                   </div>
                 </motion.div>

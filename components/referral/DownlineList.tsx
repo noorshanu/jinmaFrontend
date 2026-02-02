@@ -23,7 +23,8 @@ export default function DownlineList({ downline }: DownlineListProps) {
       month: "short",
       day: "numeric",
       year: "numeric",
-    });
+      timeZone: "UTC",
+    }) + " UTC";
   };
 
   return (
