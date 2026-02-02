@@ -5,8 +5,8 @@ import { apiClient, isRateLimitError } from "@/lib/api";
 
 const STORAGE_LAST_SEEN_GROUP = "chatLastSeenGroup";
 const STORAGE_LAST_SEEN_PRIVATE = "chatLastSeenPrivate";
-const POLL_INTERVAL_MS = 15000;
-const POLL_INTERVAL_BACKOFF_MS = 30000;
+const POLL_INTERVAL_MS = 20000;
+const POLL_INTERVAL_BACKOFF_MS = 45000;
 
 /** Dispatch this after updating lastSeen so badge refreshes immediately */
 export const CHAT_LAST_SEEN_UPDATED = "chatLastSeenUpdated";

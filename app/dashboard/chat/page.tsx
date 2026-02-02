@@ -9,8 +9,8 @@ import { apiClient, ChatMessage, isRateLimitError } from "@/lib/api";
 import { setChatLastSeenGroup, setChatLastSeenPrivate, CHAT_LAST_SEEN_UPDATED } from "@/hooks/useChatUnread";
 import { LuRefreshCw, LuSend, LuMessageCircle, LuImage, LuUser, LuUsers, LuHeadphones, LuReply, LuX } from "react-icons/lu";
 
-const POLL_INTERVAL_MS = 6000;
-const POLL_INTERVAL_BACKOFF_MS = 25000;
+const POLL_INTERVAL_MS = 10000;
+const POLL_INTERVAL_BACKOFF_MS = 30000;
 const DRAFT_DEBOUNCE_MS = 400;
 const DRAFT_KEY_GROUP = "chatDraftGroup";
 const DRAFT_KEY_PRIVATE = "chatDraftPrivate";
@@ -51,6 +51,7 @@ export default function ChatPage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollToBottomNextRef = useRef(false);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const currentConvId = tab === "group" ? groupConvId : privateConvId;
   const LOAD_OLDER_LIMIT = 50;
 
@@ -71,7 +72,10 @@ export default function ChatPage() {
         return res.data.id;
       }
     } catch (e) {
-      if (isRateLimitError(e)) setRateLimited(true);
+      if (isRateLimitError(e)) {
+        setRateLimited(true);
+        return null;
+      }
       setError(e instanceof Error ? e.message : "Failed to load group chat");
     }
     return null;
@@ -85,7 +89,10 @@ export default function ChatPage() {
         return res.data.id;
       }
     } catch (e) {
-      if (isRateLimitError(e)) setRateLimited(true);
+      if (isRateLimitError(e)) {
+        setRateLimited(true);
+        return null;
+      }
       setError(e instanceof Error ? e.message : "Failed to load support chat");
     }
     return null;
@@ -113,7 +120,10 @@ export default function ChatPage() {
         }
       }
     } catch (e) {
-      if (isRateLimitError(e)) setRateLimited(true);
+      if (isRateLimitError(e)) {
+        setRateLimited(true);
+        return;
+      }
       setError(e instanceof Error ? e.message : "Failed to load messages");
     } finally {
       if (appendOlder) setLoadingOlder(false);
@@ -155,7 +165,9 @@ export default function ChatPage() {
   useEffect(() => {
     if (!currentConvId) return;
     const intervalMs = rateLimited ? POLL_INTERVAL_BACKOFF_MS : POLL_INTERVAL_MS;
-    const interval = setInterval(() => fetchMessages(currentConvId), intervalMs);
+    const interval = setInterval(() => {
+      fetchMessages(currentConvId);
+    }, intervalMs);
     return () => clearInterval(interval);
   }, [currentConvId, fetchMessages, rateLimited]);
 
@@ -165,6 +177,33 @@ export default function ChatPage() {
       scrollToBottomNextRef.current = false;
     }
   }, [messages]);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    setShowScrollToBottom(false);
+  }, []);
+
+  const checkScrollPosition = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    const threshold = 80;
+    const nearBottom = scrollHeight - scrollTop - clientHeight <= threshold;
+    setShowScrollToBottom(!nearBottom);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    checkScrollPosition();
+    el.addEventListener("scroll", checkScrollPosition, { passive: true });
+    const ro = new ResizeObserver(checkScrollPosition);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", checkScrollPosition);
+      ro.disconnect();
+    };
+  }, [checkScrollPosition, tab, messages.length]);
 
   const handleTabChange = (t: Tab) => {
     setTab(t);
@@ -196,6 +235,7 @@ export default function ChatPage() {
         scrollToBottomNextRef.current = true;
       }
     } catch (e) {
+      if (isRateLimitError(e)) return;
       setError(e instanceof Error ? e.message : "Failed to send");
     } finally {
       setSending(false);
@@ -234,6 +274,7 @@ export default function ChatPage() {
         scrollToBottomNextRef.current = true;
       }
     } catch (e) {
+      if (isRateLimitError(e)) return;
       setError(e instanceof Error ? e.message : "Upload or send failed");
     } finally {
       setUploading(false);
@@ -351,19 +392,28 @@ export default function ChatPage() {
               </div>
             )}
 
-            <div
-              ref={scrollContainerRef}
-              className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[320px] max-h-[55vh]"
-            >
+            <div className="relative flex-1 flex flex-col min-h-[320px] max-h-[55vh]">
+              <div
+                ref={scrollContainerRef}
+                className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4"
+              >
               {sortedMessages.length > 0 && hasMoreOlder && (
                 <div className="flex justify-center pb-2">
                   <button
                     type="button"
                     onClick={() => currentConvId && fetchMessages(currentConvId, true)}
                     disabled={loadingOlder}
-                    className="text-sm text-zinc-400 hover:text-white px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5 disabled:opacity-50"
+                    className="flex items-center gap-2 text-sm text-zinc-400 hover:text-white px-3 py-2 rounded-xl border border-white/10 hover:bg-white/5 disabled:opacity-50"
+                    title="Load older messages"
                   >
-                    {loadingOlder ? "Loading…" : "Load older messages"}
+                    {loadingOlder ? (
+                      <span className="inline-block w-4 h-4 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                      </svg>
+                    )}
+                    <span>{loadingOlder ? "Loading…" : "Load older"}</span>
                   </button>
                 </div>
               )}
@@ -476,6 +526,20 @@ export default function ChatPage() {
                 </motion.div>
               ))}
               <div ref={messagesEndRef} />
+              </div>
+              {showScrollToBottom && (
+                <button
+                  type="button"
+                  onClick={scrollToBottom}
+                  className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-500 text-white text-sm font-medium shadow-lg hover:bg-blue-600 z-10"
+                  aria-label="Scroll to new messages"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
+                  New messages
+                </button>
+              )}
             </div>
 
             <div className="p-4 border-t border-white/10 bg-white/5 flex flex-col gap-2">
