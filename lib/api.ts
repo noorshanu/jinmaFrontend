@@ -82,6 +82,10 @@ export interface WalletResponse {
     totalWithdrawn: number;
     totalTransferred: number;
     createdAt: string;
+    /** Exchange-style: unique BEP20 deposit address (when enabled) */
+    depositAddress: string | null;
+    /** e.g. "BEP20 (BSC)" when depositAddress is set */
+    depositNetwork: string | null;
     // Transfer lock info
     transferLock: {
       isLocked: boolean;
