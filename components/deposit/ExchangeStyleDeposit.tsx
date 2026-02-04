@@ -33,11 +33,8 @@ export default function ExchangeStyleDeposit({
         <LuShieldCheck className="w-5 h-5" />
         <h2 className="text-lg font-semibold text-white">Your unique deposit address</h2>
       </div>
-      <p className="text-zinc-400 text-sm mb-4">
-        Send only USDT on BEP20 (BSC) network to this address. Minimum confirmations required before balance updates. Funds are credited automatically and then secured in our main wallet.
-      </p>
       <p className="text-amber-200/90 text-sm mb-4 rounded-lg bg-amber-500/10 border border-amber-500/20 p-3">
-        <strong>Gas (optional):</strong> You can send ~0.001 BNB to this same address for network fees so we can process your deposit right away. If you don’t send BNB, we’ll cover the fee for you.
+        <strong>Warning:</strong> Send only USDT on <strong>BEP20 (BSC)</strong> to this address. Sending on a different network (e.g. ERC20, other chains) or to a wrong address will result in <strong>permanent loss of funds</strong>. Double-check the network and address before sending.
       </p>
       <div className="flex flex-col sm:flex-row gap-4 items-start">
         <div className="shrink-0 w-40 h-40 rounded-xl bg-white p-2">
