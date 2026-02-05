@@ -17,10 +17,11 @@ import {
 import {
   LuTrendingUp,
   LuTrendingDown,
-
   LuRefreshCw,
   LuArrowRight,
   LuTicket,
+  LuEye,
+  LuEyeOff,
 } from "react-icons/lu";
 
 type TradePhase = "READY" | "CONFIRMED" | "WAITING" | "SETTLED";
@@ -92,6 +93,7 @@ function TradeContent() {
   const [tradeResult, setTradeResult] = useState<SignalUsageResponse | null>(null);
   const [showResultModal, setShowResultModal] = useState(false);
   const [pollingResult, setPollingResult] = useState(false);
+  const [tradeInProgressBoxVisible, setTradeInProgressBoxVisible] = useState(true);
 
   const movementBalance = wallet?.movementBalance ?? 0;
   const betAmount = useMemo(
@@ -352,6 +354,7 @@ function TradeContent() {
         setCommittedAmount(res.data.committedAmount);
         setExpiresAt(new Date(res.data.settlesAt));
         setSelectedSignalForConfirm(null);
+        setTradeInProgressBoxVisible(true);
         setPhase("WAITING");
       }
     } catch (err: unknown) {
@@ -426,57 +429,79 @@ function TradeContent() {
             </motion.div>
           )}
 
-          {/* 2. Trade in progress (countdown / result section) */}
+          {/* 2. Trade in progress (countdown / result section) - hideable */}
           {(phase === "WAITING" || phase === "SETTLED") && signalData && (
             <motion.div
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="mb-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-xl"
+              className="mb-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden"
             >
-              <div className="text-center">
-                <div className="mb-6">
-                  {timeRemaining > 0 ? (
-                    <span className="text-5xl">⏳</span>
-                  ) : !tradeResult ? (
-                    <motion.span
-                      className="inline-block text-5xl"
-                      animate={{ scale: [1, 1.15, 1], opacity: [0.9, 1, 0.9] }}
-                      transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-                      aria-hidden
-                    >
-                      ₿
-                    </motion.span>
-                  ) : (
-                    <span className="text-5xl">✅</span>
-                  )}
-                  <h2 className="text-xl font-bold text-white mt-4">
-                    {timeRemaining > 0
-                      ? "Trade in progress"
-                      : !tradeResult
-                        ? "Result on the way..."
-                        : "Trade completed"}
-                  </h2>
-                </div>
-                {timeRemaining > 0 ? (
-                  <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 mb-2">
-                    {formatTime(timeRemaining)}
+              <button
+                type="button"
+                onClick={() => setTradeInProgressBoxVisible((v) => !v)}
+                className="w-full flex items-center justify-between p-4 text-left hover:bg-white/5 transition-colors"
+                aria-expanded={tradeInProgressBoxVisible}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">
+                    {timeRemaining > 0 ? "⏳" : !tradeResult ? "₿" : "✅"}
+                  </span>
+                  <div>
+                    <h2 className="text-lg font-bold text-white">
+                      {timeRemaining > 0
+                        ? "Trade in progress"
+                        : !tradeResult
+                          ? "Result on the way..."
+                          : "Trade completed"}
+                    </h2>
+                    <p className="text-zinc-400 text-sm">
+                      {signalData.signalTitle} • ${committedAmount.toFixed(2)} locked
+                      {timeRemaining > 0 && ` • ${formatTime(timeRemaining)} left`}
+                    </p>
                   </div>
-                ) : !tradeResult ? (
-                  <p className="text-amber-400/90 text-sm mb-2">Settling your trade</p>
-                ) : null}
-                <p className="text-zinc-400 text-sm mb-6">
-                  {signalData.signalTitle} • ${committedAmount.toFixed(2)} locked
-                </p>
-                <div className="w-full max-w-md mx-auto bg-white/5 rounded-full h-2 overflow-hidden">
-                  <motion.div
-                    className="bg-gradient-to-r from-blue-500 to-cyan-500 h-2 rounded-full"
-                    animate={{
-                      width: `${timeRemaining <= 0 ? 100 : Math.max(0, 100 - (timeRemaining / 900) * 100)}%`,
-                    }}
-                    transition={{ duration: 0.5 }}
-                  />
                 </div>
-              </div>
+                <span
+                  className="shrink-0 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                  title={tradeInProgressBoxVisible ? "Hide" : "Show"}
+                >
+                  {tradeInProgressBoxVisible ? (
+                    <LuEyeOff className="w-5 h-5" aria-hidden />
+                  ) : (
+                    <LuEye className="w-5 h-5" aria-hidden />
+                  )}
+                </span>
+              </button>
+              <AnimatePresence initial={false}>
+                {tradeInProgressBoxVisible && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="border-t border-white/10"
+                  >
+                    <div className="p-6 pt-2 text-center">
+                      {timeRemaining > 0 && (
+                        <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 mb-2">
+                          {formatTime(timeRemaining)}
+                        </div>
+                      )}
+                      {!tradeResult && timeRemaining <= 0 && (
+                        <p className="text-amber-400/90 text-sm mb-2">Settling your trade</p>
+                      )}
+                      <div className="w-full max-w-md mx-auto bg-white/5 rounded-full h-2 overflow-hidden">
+                        <motion.div
+                          className="bg-gradient-to-r from-blue-500 to-cyan-500 h-2 rounded-full"
+                          animate={{
+                            width: `${timeRemaining <= 0 ? 100 : Math.max(0, 100 - (timeRemaining / 900) * 100)}%`,
+                          }}
+                          transition={{ duration: 0.5 }}
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           )}
 

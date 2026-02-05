@@ -163,6 +163,10 @@ export default function SignalsPage() {
   const pendingHistory = history.filter((h) => h.outcome === "PENDING");
   const settledHistory = history.filter((h) => h.outcome !== "PENDING");
 
+  /** True if this signal has a pending (ongoing) trade */
+  const isSignalOngoing = (signal: Signal) =>
+    pendingHistory.some((h) => h.signal?.id === signal.id);
+
   // Trading restrictions
   const movementBalance = wallet?.movementBalance ?? 0;
   const isTradingActive = userProfile?.isTradingActive ?? false;
@@ -480,13 +484,19 @@ export default function SignalsPage() {
                           </div>
                         </div>
                         <button
-                          onClick={() => openConfirmModal(signal)}
-                          disabled={!canTrade || (limits !== null && limits.dailySignalsRemaining === 0)}
+                          onClick={() => !isSignalOngoing(signal) && openConfirmModal(signal)}
+                          disabled={!canTrade || (limits !== null && limits.dailySignalsRemaining === 0) || isSignalOngoing(signal)}
                           className="btn-primary rounded-lg px-4 py-2 text-sm font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed flex items-center gap-2"
-                          title={!canTrade ? restriction?.message : undefined}
+                          title={isSignalOngoing(signal) ? "Trade in progress" : !canTrade ? restriction?.message : undefined}
                         >
-                          Trade Now
-                          <LuArrowRight className="w-4 h-4" />
+                          {isSignalOngoing(signal) ? (
+                            "Ongoing"
+                          ) : (
+                            <>
+                              Trade Now
+                              <LuArrowRight className="w-4 h-4" />
+                            </>
+                          )}
                         </button>
                       </div>
                     ))}
@@ -556,13 +566,19 @@ export default function SignalsPage() {
                           </div>
                         </div>
                         <button
-                          onClick={() => openConfirmModal(signal)}
-                          disabled={!canTrade || (limits !== null && limits.referralSignalsRemaining === 0)}
+                          onClick={() => !isSignalOngoing(signal) && openConfirmModal(signal)}
+                          disabled={!canTrade || (limits !== null && limits.referralSignalsRemaining === 0) || isSignalOngoing(signal)}
                           className="btn-primary rounded-lg px-4 py-2 text-sm font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed flex items-center gap-2"
-                          title={!canTrade ? restriction?.message : undefined}
+                          title={isSignalOngoing(signal) ? "Trade in progress" : !canTrade ? restriction?.message : undefined}
                         >
-                          Trade Now
-                          <LuArrowRight className="w-4 h-4" />
+                          {isSignalOngoing(signal) ? (
+                            "Ongoing"
+                          ) : (
+                            <>
+                              Trade Now
+                              <LuArrowRight className="w-4 h-4" />
+                            </>
+                          )}
                         </button>
                       </div>
                     ))}
@@ -632,13 +648,19 @@ export default function SignalsPage() {
                           </div>
                         </div>
                         <button
-                          onClick={() => openConfirmModal(signal)}
-                          disabled={!canTrade}
+                          onClick={() => !isSignalOngoing(signal) && openConfirmModal(signal)}
+                          disabled={!canTrade || isSignalOngoing(signal)}
                           className="rounded-lg px-4 py-2 text-sm font-medium bg-violet-500 text-white hover:bg-violet-600 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed flex items-center gap-2"
-                          title={!canTrade ? restriction?.message : undefined}
+                          title={isSignalOngoing(signal) ? "Trade in progress" : !canTrade ? restriction?.message : undefined}
                         >
-                          Trade Now
-                          <LuArrowRight className="w-4 h-4" />
+                          {isSignalOngoing(signal) ? (
+                            "Ongoing"
+                          ) : (
+                            <>
+                              Trade Now
+                              <LuArrowRight className="w-4 h-4" />
+                            </>
+                          )}
                         </button>
                       </div>
                     ))}

@@ -147,7 +147,7 @@ export default function NotificationDropdown() {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -8 }}
         transition={{ duration: 0.2 }}
-        className="fixed w-[360px] max-w-[calc(100vw-2rem)] bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-xl overflow-hidden"
+        className="fixed w-[300px] max-w-[calc(100vw-2rem)] bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-xl overflow-hidden"
         style={{
           zIndex: DROPDOWN_Z,
           top: position.top,

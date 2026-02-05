@@ -125,13 +125,105 @@ export default function DashboardNavbar() {
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-16 gap-4">
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
             <img src="/logo.png" alt="logo" className="w-50 h-14" />
           </Link>
 
-          {/* Navigation Menu */}
+          {/* Mobile: notification + avatar (space-between with logo) */}
+          <div className="flex md:hidden items-center gap-2 shrink-0">
+            <NotificationDropdown />
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setProfileDropdown(!profileDropdown)}
+                className="relative w-9 h-9 rounded-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-cyan-400 hover:ring-2 hover:ring-white/20 transition-all duration-300"
+                aria-label="Profile menu"
+              >
+                <span className="text-white text-sm font-semibold uppercase">
+                  {initials}
+                </span>
+                <span
+                  className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-zinc-700 flex items-center justify-center border border-zinc-600 transition-transform duration-200 ${
+                    profileDropdown ? "rotate-180" : ""
+                  }`}
+                >
+                  <LuChevronDown className="w-2.5 h-2.5 text-white" />
+                </span>
+              </button>
+              <AnimatePresence>
+                {profileDropdown && (
+                  <div
+                    onMouseLeave={() => setProfileDropdown(false)}
+                    className="absolute right-0 mt-2 w-48 z-50"
+                  >
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.2 }}
+                      className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl shadow-xl overflow-hidden"
+                    >
+                      <div className="p-3 border-b border-white/10">
+                        <p className="text-white text-sm font-medium">{displayName}</p>
+                        <p className="text-zinc-400 text-xs">
+                          {displayEmail || "user@example.com"}
+                        </p>
+                      </div>
+                      <div className="p-1">
+                        <Link
+                          href="/dashboard/settings"
+                          className="flex items-center gap-3 px-3 py-2 rounded-lg text-zinc-300 hover:text-white hover:bg-white/5 transition-all duration-300 text-sm"
+                          onClick={() => setProfileDropdown(false)}
+                        >
+                          <LuSettings size={16} />
+                          <span>{mounted ? t("common.settings") : navFallbacks["common.settings"]}</span>
+                        </Link>
+                        <Link
+                          href="/dashboard/chat"
+                          className="flex items-center gap-3 px-3 py-2 rounded-lg text-zinc-300 hover:text-white hover:bg-white/5 transition-all duration-300 text-sm relative"
+                          onClick={() => setProfileDropdown(false)}
+                        >
+                          <LuMessageCircle size={16} />
+                          <span>{navLabel("Chat")}</span>
+                          {chatUnreadTotal > 0 && (
+                            <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                              {chatUnreadTotal > 99 ? "99+" : chatUnreadTotal}
+                            </span>
+                          )}
+                        </Link>
+                        <Link
+                          href="/dashboard/wallet"
+                          className="flex items-center gap-3 px-3 py-2 rounded-lg text-zinc-300 hover:text-white hover:bg-white/5 transition-all duration-300 text-sm"
+                          onClick={() => setProfileDropdown(false)}
+                        >
+                          <LuTrendingUp size={16} />
+                          <span>{navLabel("common.wallet")}</span>
+                        </Link>
+                        <button
+                          onClick={() => {
+                            if (typeof window !== "undefined") {
+                              window.localStorage.removeItem("token");
+                              window.localStorage.removeItem("user");
+                            }
+                            setProfileDropdown(false);
+                            router.push("/login");
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all duration-300 text-sm"
+                        >
+                          <LuLogOut size={16} />
+                          <span>{navLabel("common.logout")}</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* Desktop: Navigation Menu */}
           <div className="hidden md:flex items-center gap-1">
             {navLinks.map((link) => {
               const isActive = pathname === link.href || 
@@ -276,9 +368,6 @@ export default function DashboardNavbar() {
               </Link>
             );
           })}
-          <div className="flex items-center justify-center gap-2 py-2">
-            <NotificationDropdown />
-          </div>
         </div>
       </div>
     </nav>
