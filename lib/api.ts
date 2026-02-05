@@ -116,6 +116,7 @@ export interface TransferResponse {
   newBalances: {
     mainBalance: number;
     movementBalance: number;
+    totalBalance?: number;
   };
   lockTriggered?: boolean;
   lockDurationDays?: number;

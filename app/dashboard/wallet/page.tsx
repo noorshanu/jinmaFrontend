@@ -132,13 +132,16 @@ export default function WalletPage() {
         setTransferSuccess(res.message || "Transfer successful!");
         setTransferAmount("");
         
-        // Update wallet balances
+        // Update wallet from API (single source of truth; use totalBalance if provided to avoid float drift)
         if (wallet && res.data.newBalances) {
+          const nb = res.data.newBalances;
           setWallet({
             ...wallet,
-            mainBalance: res.data.newBalances.mainBalance,
-            movementBalance: res.data.newBalances.movementBalance,
-            totalBalance: res.data.newBalances.mainBalance + res.data.newBalances.movementBalance
+            mainBalance: nb.mainBalance,
+            movementBalance: nb.movementBalance,
+            totalBalance: typeof (nb as { totalBalance?: number }).totalBalance === "number"
+              ? (nb as { totalBalance: number }).totalBalance
+              : nb.mainBalance + nb.movementBalance,
           });
         }
 
