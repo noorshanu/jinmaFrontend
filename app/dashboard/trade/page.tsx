@@ -559,7 +559,13 @@ function TradeContent() {
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl"
               >
-                <h2 className="text-lg font-semibold text-white mb-4">Trade history</h2>
+                      <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-white mb-4">Trade history</h2>
+
+<h2 className="text-sm text-zinc-400">
+  Movement balance: ${wallet?.movementBalance.toFixed(2)}
+</h2>
+          </div>
                 {loadingHistory ? (
                   <div className="flex items-center justify-center py-8">
                     <LuRefreshCw className="w-6 h-6 text-blue-400 animate-spin" />
