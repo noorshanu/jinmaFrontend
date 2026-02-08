@@ -100,13 +100,6 @@ export default function SignalsPage() {
     // No auto-refresh - user can manually refresh if needed
   }, [fetchTradingStatus, fetchSignals]);
 
-  // If user has no referral allowance and is on referral tab, switch to daily (tab is hidden when ineligible)
-  useEffect(() => {
-    if (limits !== null && limits.referralSignalsRemaining === 0 && activeTab === "referral") {
-      setActiveTab("daily");
-    }
-  }, [limits, activeTab]);
-
   // Open confirmation modal
   const openConfirmModal = (signal: Signal) => {
     setConfirmModal({ isOpen: true, signal });
@@ -414,18 +407,16 @@ export default function SignalsPage() {
             >
               CORE SIGNALS ({dailySignals.length})
             </button>
-            {limits !== null && limits.maxReferralSignals > 0 && (
             <button
               onClick={() => setActiveTab("referral")}
               className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${
                 activeTab === "referral"
-                  ? "bg-blue-500/20 text-blue-400 shadow-lg shadow-blue-500/20"
+                  ? "bg-cyan-500/20 text-cyan-400 shadow-lg shadow-cyan-500/20"
                   : "text-zinc-400 hover:text-white"
               }`}
             >
               Referral ({referralSignals.length})
             </button>
-            )}
             <button
               onClick={() => setActiveTab("welcome")}
               className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${
@@ -567,7 +558,7 @@ export default function SignalsPage() {
                         </div>
                         <button
                           onClick={() => !isSignalOngoing(signal) && openConfirmModal(signal)}
-                          disabled={!canTrade || (limits !== null && limits.referralSignalsRemaining === 0) || isSignalOngoing(signal)}
+                          disabled={!canTrade || isSignalOngoing(signal)}
                           className="btn-primary rounded-lg px-4 py-2 text-sm font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed flex items-center gap-2"
                           title={isSignalOngoing(signal) ? "Trade in progress" : !canTrade ? restriction?.message : undefined}
                         >
@@ -593,20 +584,10 @@ export default function SignalsPage() {
                 transition={{ delay: 0.1 }}
                 className="bg-cyan-500/10 border border-cyan-500/20 rounded-2xl p-6"
               >
-                <h3 className="text-lg font-semibold text-cyan-300 mb-3">💎 Referral Signal Tiers</h3>
-                <div className="space-y-2 text-sm text-cyan-400/80">
-                  <div className="flex items-center justify-between">
-                    <span>$550 - $1,250</span>
-                    <span>6 signals (3/day for 2 days)</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>$3,000 - $10,000</span>
-                    <span>15 signals (3/day for 5 days)</span>
-                  </div>
-                  <p className="text-xs text-cyan-500/60 mt-3">
-                    Signals are issued at 3 PM UTC and can be accumulated over time.
-                  </p>
-                </div>
+                <h3 className="text-lg font-semibold text-cyan-300 mb-3">💎 Referral Signals</h3>
+                <p className="text-sm text-cyan-400/80">
+                  Referral signals are sent by admin to selected users. You can use each signal once. No grant or allowance required.
+                </p>
               </motion.div>
             </div>
           )}
@@ -832,11 +813,13 @@ export default function SignalsPage() {
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-400 text-sm">Type</span>
                   <span className={`text-sm font-medium px-2 py-0.5 rounded ${
-                    confirmModal.signal.type === "DAILY" 
-                      ? "bg-blue-500/20 text-blue-400" 
-                      : "bg-cyan-500/20 text-cyan-400"
+                    confirmModal.signal.type === "DAILY"
+                      ? "bg-blue-500/20 text-blue-400"
+                      : confirmModal.signal.type === "REFERRAL"
+                        ? "bg-cyan-500/20 text-cyan-400"
+                        : "bg-violet-500/20 text-violet-400"
                   }`}>
-                    {confirmModal.signal.type === "DAILY" ? "DAILY" : "REFERRAL"}
+                    {confirmModal.signal.type === "DAILY" ? "CORE" : confirmModal.signal.type === "REFERRAL" ? "REFERRAL" : "WELCOME"}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
