@@ -93,6 +93,26 @@ function TradeContent() {
   const [showResultModal, setShowResultModal] = useState(false);
   const [pollingResult, setPollingResult] = useState(false);
 
+  // Live UTC time: set only on client to avoid hydration mismatch (server vs client would render different seconds)
+  const [currentUTCTime, setCurrentUTCTime] = useState<string>("—");
+  useEffect(() => {
+    const format = () => {
+      const now = new Date();
+      return (
+        now.toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          timeZone: "UTC",
+          hour12: true,
+        }) + " UTC"
+      );
+    };
+    setCurrentUTCTime(format());
+    const t = setInterval(() => setCurrentUTCTime(format()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
   const movementBalance = wallet?.movementBalance ?? 0;
   const betAmount = useMemo(
     () =>
@@ -103,19 +123,6 @@ function TradeContent() {
           : 0,
     [movementBalance, selectedSignalForConfirm, signalData]
   );
-
-  const getCurrentUTCTime = () => {
-    const now = new Date();
-    return (
-      now.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        timeZone: "UTC",
-        hour12: true,
-      }) + " UTC"
-    );
-  };
 
   /** Format time for display: use customTime (HH:mm) from admin or fallback by timeSlot */
   const getTradingTime = (slot: string, custom?: string | null) => {
@@ -139,7 +146,7 @@ function TradeContent() {
       case "CUSTOM":
         return "WELCOME SWING SIGNALS";
       default:
-        return getCurrentUTCTime();
+        return currentUTCTime;
     }
   };
 
@@ -388,7 +395,7 @@ function TradeContent() {
                 <p className="text-sm text-zinc-400">BTC/USDT Live Chart</p>
                 <p className="text-lg font-semibold text-white">TradingView</p>
               </div>
-              <p className="text-xs text-zinc-500">{getCurrentUTCTime()}</p>
+              <p className="text-xs text-zinc-500">{currentUTCTime}</p>
             </div>
             <div className="relative h-[400px] w-full overflow-hidden bg-black/40 rounded-xl">
               <div id="tv-btc-chart" className="h-full w-full" />
