@@ -563,7 +563,7 @@ function TradeContent() {
           <h2 className="text-lg font-semibold text-white mb-4">Trade history</h2>
 
 <h2 className="text-sm text-zinc-400">
-  Movement balance: ${wallet?.movementBalance.toFixed(2)}
+  Movement Wallet : ${wallet?.movementBalance.toFixed(2)}
 </h2>
           </div>
                 {loadingHistory ? (
