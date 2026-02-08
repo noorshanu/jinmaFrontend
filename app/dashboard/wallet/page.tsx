@@ -162,7 +162,13 @@ export default function WalletPage() {
 
   const getMaxAmount = () => {
     if (!wallet) return 0;
-    return transferDirection === "main_to_movement" ? wallet.mainBalance : wallet.movementBalance;
+    if (transferDirection === "main_to_movement") return wallet.mainBalance;
+    const minInMovement = wallet.transferFee?.minBalanceForTraders ?? 160;
+    if (wallet.isTradingActive && minInMovement > 0) {
+      const maxFromMovement = Math.max(0, wallet.movementBalance - minInMovement);
+      return Math.min(wallet.movementBalance, maxFromMovement);
+    }
+    return wallet.movementBalance;
   };
 
   const formatDate = (dateString: string) => {
@@ -630,6 +636,11 @@ export default function WalletPage() {
                 <div className="p-4 bg-white/5 rounded-xl">
                   <p className="text-zinc-400 text-sm">Available to transfer:</p>
                   <p className="text-2xl font-bold text-white">${getMaxAmount().toFixed(2)}</p>
+                  {transferDirection === "movement_to_main" && wallet?.isTradingActive && (wallet.transferFee?.minBalanceForTraders ?? 160) > 0 && (
+                    <p className="text-amber-400/90 text-xs mt-1">
+                      Active trading: at least ${wallet.transferFee?.minBalanceForTraders ?? 160} must remain in Movement wallet.
+                    </p>
+                  )}
                 </div>
 
                 {/* Amount */}

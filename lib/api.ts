@@ -94,14 +94,17 @@ export interface WalletResponse {
       lockDurationDays: number;
       lastMainToMovementTransfer: string | null;
     };
-    // Transfer fee info
+    // Transfer fee info (minBalanceForTraders: active traders must keep this much in movement when transferring to main)
     transferFee: {
       feePercent: number;
       flatFee: number;
       minAmount: number;
       isEnabled: boolean;
       message: string;
+      minBalanceForTraders?: number;
     };
+    /** When true, Movement → Main transfer is capped so at least minBalanceForTraders remains in movement */
+    isTradingActive?: boolean;
   };
 }
 
@@ -214,6 +217,8 @@ export interface WithdrawalSettingsResponse {
     feePercent: number;
     flatFee: number;
     message: string;
+    /** Minimum total balance (main + movement) that must remain for users who have traded. Default 160. */
+    minBalanceForTraders?: number;
   };
 }
 

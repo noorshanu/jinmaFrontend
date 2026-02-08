@@ -32,6 +32,7 @@ interface WithdrawalSettings {
   feePercent: number;
   flatFee: number;
   message: string;
+  minBalanceForTraders?: number;
 }
 
 interface Withdrawal {
@@ -60,6 +61,7 @@ export default function WithdrawPage() {
   const [settings, setSettings] = useState<WithdrawalSettings | null>(null);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [isTradingActive, setIsTradingActive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -84,10 +86,11 @@ export default function WithdrawPage() {
 
   const fetchData = async () => {
     try {
-      const [settingsRes, historyRes, walletRes] = await Promise.all([
+      const [settingsRes, historyRes, walletRes, profileRes] = await Promise.all([
         apiClient.getWithdrawalSettings(),
         apiClient.getWithdrawalHistory(1, 10),
         apiClient.getWallet(),
+        apiClient.getUserProfile(),
       ]);
 
       if (settingsRes.success && settingsRes.data) {
@@ -98,6 +101,9 @@ export default function WithdrawPage() {
       }
       if (walletRes.success && walletRes.data) {
         setWallet(walletRes.data.wallet);
+      }
+      if (profileRes.success && profileRes.data?.isTradingActive !== undefined) {
+        setIsTradingActive(!!profileRes.data.isTradingActive);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load data");
@@ -282,6 +288,13 @@ export default function WithdrawPage() {
   }
 
   const hasPendingWithdrawal = withdrawals.some((w) => w.status === "pending");
+  const minBalanceForTraders = settings?.minBalanceForTraders ?? 160;
+  const movementBalance = wallet?.movementBalance ?? 0;
+  const canWithdraw = !isTradingActive || movementBalance >= minBalanceForTraders;
+  const maxWithdrawable = Math.min(
+    settings?.maxAmount ?? 10000,
+    wallet?.mainBalance ?? 0
+  );
 
   return (
     <>
@@ -375,6 +388,27 @@ export default function WithdrawPage() {
             </motion.div>
           )}
 
+          {/* Movement minimum: active traders must have at least $160 in Movement to withdraw */}
+          {settings && isTradingActive && movementBalance < minBalanceForTraders && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl"
+            >
+              <div className="flex items-start gap-3">
+                <LuTriangleAlert size={24} className="text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-amber-400 mb-1">
+                    Minimum required in Movement wallet
+                  </h3>
+                  <p className="text-zinc-300 text-sm">
+                    You must have at least ${minBalanceForTraders} in your Movement wallet to withdraw. You currently have ${movementBalance.toFixed(2)} in Movement. Transfer funds from Main to Movement first, then you can withdraw.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Withdrawal Disabled Banner */}
           {settings && !settings.isWithdrawalEnabled && (
             <motion.div
@@ -456,17 +490,17 @@ export default function WithdrawPage() {
                   type="number"
                         step="0.01"
                         min={settings?.minAmount || 1}
-                        max={Math.min(settings?.maxAmount || 10000, wallet?.mainBalance || 0)}
+                        max={maxWithdrawable}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0.00"
-                        disabled={!settings?.isWithdrawalOpen || hasPendingWithdrawal}
+                        disabled={!settings?.isWithdrawalOpen || hasPendingWithdrawal || !canWithdraw}
                         className="w-full pl-8 pr-20 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                   <button
                     type="button"
-                        onClick={() => setAmount(String(wallet?.mainBalance || 0))}
-                        disabled={!settings?.isWithdrawalOpen || hasPendingWithdrawal}
+                        onClick={() => setAmount(String(maxWithdrawable))}
+                        disabled={!settings?.isWithdrawalOpen || hasPendingWithdrawal || !canWithdraw}
                         className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 text-xs text-blue-400 hover:text-blue-300 bg-blue-500/10 rounded-lg disabled:opacity-50"
                       >
                         MAX
@@ -487,7 +521,7 @@ export default function WithdrawPage() {
                     <select
                       value={network}
                       onChange={(e) => setNetwork(e.target.value as "TRC20" | "BEP20" | "ERC20")}
-                      disabled={!settings?.isWithdrawalOpen || hasPendingWithdrawal}
+                      disabled={!settings?.isWithdrawalOpen || hasPendingWithdrawal || !canWithdraw}
                       className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <option value="TRC20">Tron (TRC20)</option>
@@ -509,7 +543,7 @@ export default function WithdrawPage() {
                       value={walletAddress}
                       onChange={(e) => setWalletAddress(e.target.value)}
                       placeholder={network === "TRC20" ? "T..." : "0x..."}
-                      disabled={!settings?.isWithdrawalOpen || hasPendingWithdrawal}
+                      disabled={!settings?.isWithdrawalOpen || hasPendingWithdrawal || !canWithdraw}
                       className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm"
                     />
                     <p className="text-zinc-500 text-xs mt-1">
@@ -578,6 +612,7 @@ export default function WithdrawPage() {
                       sendingOtp ||
                       !settings?.isWithdrawalOpen ||
                       hasPendingWithdrawal ||
+                      !canWithdraw ||
                       !amount ||
                       !walletAddress
                     }
