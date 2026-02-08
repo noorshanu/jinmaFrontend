@@ -489,8 +489,8 @@ function TradeContent() {
             </motion.div>
           )}
 
-          {/* 3. Signals to use (when READY and no active trade from this page) */}
-          {phase === "READY" && !usageId && (
+          {/* 3. Signals to use (when READY with no active trade, or WAITING so user sees list with "Trade running" disabled) */}
+          {((phase === "READY" && !usageId) || phase === "WAITING") && (
             <>
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -500,6 +500,11 @@ function TradeContent() {
                 <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                   <LuTicket className="w-5 h-5 text-blue-400" />
                   Signals to use
+                  {phase === "WAITING" && (
+                    <span className="ml-2 rounded-full bg-amber-500/20 px-2.5 py-0.5 text-xs font-medium text-amber-400">
+                      Trade running
+                    </span>
+                  )}
                 </h2>
                 {loadingSignals ? (
                   <div className="flex items-center justify-center py-12">
@@ -518,29 +523,32 @@ function TradeContent() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {availableSignals.map((s) => (
-                      <div
-                        key={s.id}
-                        className={`flex items-center justify-between p-4 rounded-xl border ${
-                          s.type === "WELCOME" ? "bg-violet-500/5 border-violet-500/20" : "bg-white/5 border-white/10"
-                        }`}
-                      >
-                        <div>
-                          <p className="font-medium text-white">{s.title}</p>
-                          <p className="text-sm text-zinc-400">
-                            {getSignalTypeLabel(s.type)} • {getTradingTime(s.timeSlot, s.customTime)} • {s.commitPercent}% of balance • {formatTimeRemaining(s.timeRemaining)} left
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => setSelectedSignalForConfirm(s)}
-                          disabled={!canTrade}
-                          className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-sm font-medium text-white hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                          title={!canTrade ? restriction?.message : undefined}
+                    {availableSignals.map((s) => {
+                      const isRunningTrade = phase === "WAITING" && signalData && s.id === signalData.signalId;
+                      return (
+                        <div
+                          key={s.id}
+                          className={`flex items-center justify-between p-4 rounded-xl border ${
+                            s.type === "WELCOME" ? "bg-violet-500/5 border-violet-500/20" : "bg-white/5 border-white/10"
+                          }`}
                         >
-                          Use <LuArrowRight className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
+                          <div>
+                            <p className="font-medium text-white">{s.title}</p>
+                            <p className="text-sm text-zinc-400">
+                              {getSignalTypeLabel(s.type)} • {getTradingTime(s.timeSlot, s.customTime)} • {s.commitPercent}% of balance • {formatTimeRemaining(s.timeRemaining)} left
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => !isRunningTrade && phase === "READY" && setSelectedSignalForConfirm(s)}
+                            disabled={isRunningTrade || !canTrade}
+                            className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-sm font-medium text-white hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={isRunningTrade ? "Trade running" : !canTrade ? restriction?.message : undefined}
+                          >
+                            {isRunningTrade ? "Trade running" : "Use"} <LuArrowRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </motion.div>
@@ -639,16 +647,22 @@ function TradeContent() {
                   <p className="text-zinc-400 text-sm mt-1">
                     {getSignalTypeLabel(signalDataFromUrl.signalType)} • {getTradingTime(signalDataFromUrl.timeSlot, signalDataFromUrl.customTime)} • {signalDataFromUrl.commitPercent}% of balance
                   </p>
-                  <button
-                    onClick={() => {
-                      const s = availableSignals.find((x) => x.id === signalDataFromUrl.signalId);
-                      if (s) setSelectedSignalForConfirm(s);
-                    }}
-                    disabled={!canTrade}
-                    className="mt-4 flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50"
-                  >
-                    Use <LuArrowRight className="w-4 h-4" />
-                  </button>
+                  {(() => {
+                    const isRunningTrade = phase === "WAITING" && signalData && signalDataFromUrl.signalId === signalData.signalId;
+                    return (
+                      <button
+                        onClick={() => {
+                          if (isRunningTrade) return;
+                          const s = availableSignals.find((x) => x.id === signalDataFromUrl.signalId);
+                          if (s) setSelectedSignalForConfirm(s);
+                        }}
+                        disabled={isRunningTrade || !canTrade}
+                        className="mt-4 flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50"
+                      >
+                        {isRunningTrade ? "Trade running" : "Use"} <LuArrowRight className="w-4 h-4" />
+                      </button>
+                    );
+                  })()}
                 </motion.div>
               )}
             </>
