@@ -370,26 +370,20 @@ export default function SignalsPage() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-6 grid grid-cols-2 md:grid-cols-4 gap-4"
+              className="mb-6 grid grid-cols-2 md:grid-cols-3 gap-4"
             >
               <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4">
-                <p className="text-zinc-400 text-sm">CORE Used</p>
-                <p className="text-2xl font-bold text-white">
-                  {limits.dailySignalsUsed}/{limits.maxDailySignals}
-                </p>
+                <p className="text-zinc-400 text-sm">CORE signals used today</p>
+                <p className="text-2xl font-bold text-white">{limits.dailySignalsUsed}</p>
               </div>
               <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4">
-                <p className="text-zinc-400 text-sm">CORE Remaining</p>
-                <p className="text-2xl font-bold text-green-400">{limits.dailySignalsRemaining}</p>
-              </div>
-              <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4">
-                <p className="text-zinc-400 text-sm">Referral Used</p>
+                <p className="text-zinc-400 text-sm">Referral used</p>
                 <p className="text-2xl font-bold text-white">
                   {limits.referralSignalsUsed}/{limits.maxReferralSignals}
                 </p>
               </div>
               <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4">
-                <p className="text-zinc-400 text-sm">Referral Remaining</p>
+                <p className="text-zinc-400 text-sm">Referral remaining</p>
                 <p className="text-2xl font-bold text-cyan-400">{limits.referralSignalsRemaining}</p>
               </div>
             </motion.div>
@@ -476,7 +470,7 @@ export default function SignalsPage() {
                         </div>
                         <button
                           onClick={() => !isSignalOngoing(signal) && openConfirmModal(signal)}
-                          disabled={!canTrade || (limits !== null && limits.dailySignalsRemaining === 0) || isSignalOngoing(signal)}
+                          disabled={!canTrade || isSignalOngoing(signal)}
                           className="btn-primary rounded-lg px-4 py-2 text-sm font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed flex items-center gap-2"
                           title={isSignalOngoing(signal) ? "Trade in progress" : !canTrade ? restriction?.message : undefined}
                         >

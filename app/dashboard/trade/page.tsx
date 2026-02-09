@@ -67,7 +67,7 @@ function TradeContent() {
 
   // Available signals & history (for main view)
   const [availableSignals, setAvailableSignals] = useState<Signal[]>([]);
-  const [limits, setLimits] = useState<{ dailySignalsRemaining: number; referralSignalsRemaining: number } | null>(null);
+  const [limits, setLimits] = useState<{ dailySignalsUsed?: number; referralSignalsRemaining?: number } | null>(null);
   const [loadingSignals, setLoadingSignals] = useState(true);
   const [history, setHistory] = useState<SignalHistoryItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
@@ -559,11 +559,11 @@ function TradeContent() {
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl"
               >
-                      <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white mb-4">Trade history</h2>
 
 <h2 className="text-sm text-zinc-400">
-  Movement Wallet : ${wallet?.movementBalance.toFixed(2)}
+  Movement balance: ${wallet?.movementBalance.toFixed(2)}
 </h2>
           </div>
                 {loadingHistory ? (

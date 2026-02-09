@@ -277,10 +277,8 @@ export interface Signal {
 
 export interface SignalLimits {
   dailySignalsUsed: number;
-  dailySignalsRemaining: number;
   referralSignalsUsed: number;
   referralSignalsRemaining: number;
-  maxDailySignals: number;
   maxReferralSignals: number;
 }
 
