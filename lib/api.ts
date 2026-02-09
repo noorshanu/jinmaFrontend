@@ -1,5 +1,23 @@
 const API_BASE_URL = 'https://api.jinma.tech/api';
 
+/** On 401: clear auth + cache and redirect to login (user app). */
+function clearAuthAndRedirectToLogin(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  try {
+    sessionStorage.clear();
+  } catch {
+    // ignore
+  }
+  if (typeof caches !== 'undefined' && typeof caches.keys === 'function') {
+    caches.keys().then((names) => {
+      names.forEach((name) => caches.delete(name));
+    }).catch(() => {});
+  }
+  window.location.assign('/login');
+}
+
 /** Use when handling errors to back off or retry on rate limit */
 export function isRateLimitError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
