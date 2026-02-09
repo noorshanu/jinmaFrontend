@@ -319,13 +319,13 @@ export default function DashboardPage() {
           >
             <h2 className="text-xl font-semibold text-white mb-4">Quick Actions</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Link
+              {/* <Link
                 href="/dashboard/signals"
                 className="flex flex-col items-center justify-center p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-all duration-300 hover:scale-105"
               >
                 <LuTicket size={28} className="text-amber-400 mb-2" />
                 <span className="text-sm text-zinc-300 font-medium">Signals</span>
-              </Link>
+              </Link> */}
               <Link
                 href="/dashboard/trade"
                 className="flex flex-col items-center justify-center p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-all duration-300 hover:scale-105"
