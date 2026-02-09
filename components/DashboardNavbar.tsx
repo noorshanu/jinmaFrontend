@@ -23,7 +23,7 @@ import useChatUnread from "@/hooks/useChatUnread";
 
 const navLinks = [
   { href: "/dashboard", labelKey: "nav.dashboard", icon: LuLayoutDashboard },
-  { href: "/dashboard/signals", labelKey: "nav.signals", icon: LuTicket },
+  // { href: "/dashboard/signals", labelKey: "nav.signals", icon: LuTicket },
   { href: "/dashboard/trade", labelKey: "nav.trade", icon: LuTrendingUp },
   { href: "/dashboard/referrals", labelKey: "nav.referrals", icon: LuUsers },
   { href: "/dashboard/grades", labelKey: "nav.grades", icon: LuStar },
@@ -32,7 +32,7 @@ const navLinks = [
 // English fallbacks for SSR/hydration (server and client must match until mounted)
 const navFallbacks: Record<string, string> = {
   "nav.dashboard": "Dashboard",
-  "nav.signals": "Signals",
+  // "nav.signals": "Signals",
   "nav.trade": "Trade",
   "nav.chat": "Chat",
   "nav.referrals": "Referrals",
