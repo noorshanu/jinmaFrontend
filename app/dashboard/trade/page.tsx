@@ -371,6 +371,16 @@ function TradeContent() {
   const pendingHistory = history.filter((h) => h.outcome === "PENDING");
   const settledHistory = history.filter((h) => h.outcome !== "PENDING");
 
+  const totalProfitLoss = useMemo(() => {
+    let profit = 0;
+    let loss = 0;
+    for (const h of history) {
+      if (h.outcome === "PROFIT" && h.resultAmount != null) profit += h.resultAmount;
+      if (h.outcome === "LOSS" && h.resultAmount != null) loss += Math.abs(h.resultAmount);
+    }
+    return { totalProfit: profit, totalLoss: loss };
+  }, [history]);
+
   return (
     <>
       <DashboardNavbar />
@@ -460,9 +470,9 @@ function TradeContent() {
                   </div>
                 </div>
                 <Link
-                  href="/dashboard/signals"
+                  href="/dashboard/trade"
                   className="shrink-0 p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
-                  title="Close and go to Signals"
+                  title="Close and go to Trade"
                 >
                   <LuX className="w-5 h-5" aria-hidden />
                 </Link>
@@ -559,12 +569,19 @@ function TradeContent() {
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl"
               >
-          <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white mb-4">Trade history</h2>
-
-<h2 className="text-sm text-zinc-400">
-  Movement balance: ${wallet?.movementBalance.toFixed(2)}
-</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h2 className="text-lg font-semibold text-white">Trade history</h2>
+          <div className="flex items-center gap-4 text-sm">
+            <span className="text-green-400">
+              Profit: ${totalProfitLoss.totalProfit.toFixed(2)}
+            </span>
+            <span className="text-red-400">
+              Loss: ${totalProfitLoss.totalLoss.toFixed(2)}
+            </span>
+            <span className="text-zinc-400">
+              Movement: ${(wallet?.movementBalance ?? 0).toFixed(2)}
+            </span>
+          </div>
           </div>
                 {loadingHistory ? (
                   <div className="flex items-center justify-center py-8">
