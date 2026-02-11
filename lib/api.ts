@@ -126,6 +126,13 @@ export interface WalletResponse {
   };
 }
 
+export interface CreateDepositIssueRequest {
+  amount: number;
+  depositTxUrl?: string;
+  screenshotFile?: File;
+  note: string;
+}
+
 export interface TransferResponse {
   id: string;
   direction: string;
@@ -455,6 +462,13 @@ class ApiClient {
       }
 
       if (!response.ok) {
+        if (response.status === 401) {
+          clearAuthAndRedirectToLogin();
+          const message = data && typeof data === 'object' && typeof (data as { message?: string }).message === 'string'
+            ? (data as { message: string }).message
+            : 'Session expired. Please sign in again.';
+          throw new Error(message);
+        }
         if (response.status === 429) {
           throw new Error('Too many requests. Please wait a moment and try again.');
         }
@@ -606,6 +620,9 @@ class ApiClient {
 
     const data = await response.json();
     if (!response.ok) {
+      if (response.status === 401) {
+        clearAuthAndRedirectToLogin();
+      }
       throw new Error(data.message || 'An error occurred');
     }
     return data;
@@ -635,6 +652,38 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ direction, amount, note }),
     });
+  }
+
+  async createDepositIssue(payload: CreateDepositIssueRequest): Promise<ApiResponse<{ id: string }>> {
+    const url = `${this.baseUrl}/wallet/deposit-issues`;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+    const formData = new FormData();
+    formData.append('amount', String(payload.amount));
+    if (payload.depositTxUrl) {
+      formData.append('depositTxUrl', payload.depositTxUrl);
+    }
+    formData.append('note', payload.note);
+    if (payload.screenshotFile) {
+      formData.append('screenshot', payload.screenshotFile);
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      body: formData,
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      if (response.status === 401) {
+        clearAuthAndRedirectToLogin();
+      }
+      throw new Error(data.message || 'An error occurred');
+    }
+    return data;
   }
 
   async getTransferHistory(page = 1, limit = 10): Promise<ApiResponse<TransferHistoryResponse>> {
@@ -853,7 +902,12 @@ class ApiClient {
     };
     const response = await fetch(url, config);
     const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Upload failed');
+    if (!response.ok) {
+      if (response.status === 401) {
+        clearAuthAndRedirectToLogin();
+      }
+      throw new Error(data.message || 'Upload failed');
+    }
     return data;
   }
 }

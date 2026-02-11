@@ -92,6 +92,7 @@ function TradeContent() {
   const [tradeResult, setTradeResult] = useState<SignalUsageResponse | null>(null);
   const [showResultModal, setShowResultModal] = useState(false);
   const [pollingResult, setPollingResult] = useState(false);
+  const [tradeBlockHidden, setTradeBlockHidden] = useState(false);
 
   // Live UTC time: set only on client to avoid hydration mismatch (server vs client would render different seconds)
   const [currentUTCTime, setCurrentUTCTime] = useState<string>("—");
@@ -112,6 +113,11 @@ function TradeContent() {
     const t = setInterval(() => setCurrentUTCTime(format()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // Reset "block hidden" when trade is done so next trade shows the block again
+  useEffect(() => {
+    if (phase === "READY" && !usageId) setTradeBlockHidden(false);
+  }, [phase, usageId]);
 
   const movementBalance = wallet?.movementBalance ?? 0;
   const betAmount = useMemo(
@@ -443,8 +449,8 @@ function TradeContent() {
             </motion.div>
           )}
 
-          {/* 2. Trade in progress (countdown / result section) */}
-          {(phase === "WAITING" || phase === "SETTLED") && signalData && (
+          {/* 2. Trade in progress (countdown / result section) - hide on close, trade runs in background */}
+          {(phase === "WAITING" || phase === "SETTLED") && signalData && !tradeBlockHidden && (
             <motion.div
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -469,13 +475,14 @@ function TradeContent() {
                     </p>
                   </div>
                 </div>
-                <Link
-                  href="/dashboard/trade"
+                <button
+                  type="button"
+                  onClick={() => setTradeBlockHidden(true)}
                   className="shrink-0 p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
-                  title="Close and go to Trade"
+                  title="Minimize – trade continues in background"
                 >
                   <LuX className="w-5 h-5" aria-hidden />
-                </Link>
+                </button>
               </div>
               <div className="border-t border-white/10 p-6 pt-2 text-center">
                 {timeRemaining > 0 && (

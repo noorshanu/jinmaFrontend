@@ -31,6 +31,12 @@ export default function DepositPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
   const [historyPagination, setHistoryPagination] = useState({ page: 1, limit: 10, total: 0, pages: 0 });
+  const [showIssueModal, setShowIssueModal] = useState(false);
+  const [issueAmount, setIssueAmount] = useState("");
+  const [issueTxUrl, setIssueTxUrl] = useState("");
+  const [issueScreenshotFile, setIssueScreenshotFile] = useState<File | null>(null);
+  const [issueNote, setIssueNote] = useState("");
+  const [submittingIssue, setSubmittingIssue] = useState(false);
 
   const fetchDepositAddress = () => {
     setLoading(true);
@@ -77,6 +83,43 @@ export default function DepositPage() {
   useEffect(() => {
     fetchDepositHistory(1);
   }, [fetchDepositHistory]);
+
+  const handleSubmitIssue = async () => {
+    const amountValue = parseFloat(issueAmount);
+    if (!amountValue || amountValue <= 0) {
+      setError("Please enter the deposit amount you sent.");
+      return;
+    }
+    if (!issueNote.trim()) {
+      setError("Please enter a short note about the issue.");
+      return;
+    }
+    setSubmittingIssue(true);
+    setError("");
+    try {
+      const res = await apiClient.createDepositIssue({
+        amount: amountValue,
+        depositTxUrl: issueTxUrl.trim() || undefined,
+        screenshotFile: issueScreenshotFile || undefined,
+        note: issueNote.trim(),
+      });
+      if (res.success) {
+        setSuccess("Issue submitted. Our team will review your deposit.");
+        setShowIssueModal(false);
+        setIssueAmount("");
+        setIssueTxUrl("");
+        setIssueScreenshotFile(null);
+        setIssueNote("");
+        setTimeout(() => setSuccess(""), 5000);
+      } else {
+        setError(res.message || "Failed to submit issue. Please try again.");
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to submit issue. Please try again.");
+    } finally {
+      setSubmittingIssue(false);
+    }
+  };
 
   // Backup: used when WalletConnect deposit is enabled
   // const handleSuccess = (message: string) => {
@@ -159,8 +202,19 @@ export default function DepositPage() {
             className="mt-8 rounded-2xl border border-white/10 bg-white/5 overflow-hidden"
           >
             <div className="p-4 border-b border-white/10">
-              <h2 className="text-lg font-semibold text-white">Deposit History</h2>
-              <p className="text-zinc-400 text-sm">Your recent deposits (manual, WalletConnect, or auto-credited)</p>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Deposit History</h2>
+                  <p className="text-zinc-400 text-sm">Your recent deposits (manual, WalletConnect, or auto-credited)</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowIssueModal(true)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-amber-500/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-500"
+                >
+                  Raise deposit issue
+                </button>
+              </div>
             </div>
             {historyLoading ? (
               <div className="p-8 text-center text-zinc-400">Loading…</div>
@@ -255,6 +309,104 @@ export default function DepositPage() {
           </motion.div> */}
         </div>
       </div>
+
+      {/* Deposit Issue Modal */}
+      {showIssueModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-zinc-900 border border-white/10 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-white">Raise deposit issue</h2>
+              <button
+                type="button"
+                onClick={() => setShowIssueModal(false)}
+                className="text-zinc-400 hover:text-zinc-200 text-sm"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-zinc-400 mb-4">
+              Tell us what went wrong with your deposit. Share the amount you sent, optionally the transaction URL, and attach a screenshot so admin can review.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-zinc-300 mb-1">
+                  Deposit amount (USD) *
+                </label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={issueAmount}
+                  onChange={(e) => setIssueAmount(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  placeholder="e.g. 200"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-300 mb-1">
+                  Deposit transaction URL (optional)
+                </label>
+                <input
+                  type="url"
+                  value={issueTxUrl}
+                  onChange={(e) => setIssueTxUrl(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  placeholder="Link to BSCScan or exchange transaction"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-300 mb-1">
+                  Screenshot (optional)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setIssueScreenshotFile(file);
+                  }}
+                  className="w-full rounded-xl border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+                {issueScreenshotFile && (
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Selected: {issueScreenshotFile.name}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-300 mb-1">
+                  Short note about the issue *
+                </label>
+                <textarea
+                  value={issueNote}
+                  onChange={(e) => setIssueNote(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-xl border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  placeholder="Example: I deposited $200 USDT 30 minutes ago but balance has not updated."
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowIssueModal(false)}
+                disabled={submittingIssue}
+                className="flex-1 rounded-xl border border-white/10 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-700 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitIssue}
+                disabled={submittingIssue}
+                className="flex-1 rounded-xl bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+              >
+                {submittingIssue ? "Submitting..." : "Submit issue"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
