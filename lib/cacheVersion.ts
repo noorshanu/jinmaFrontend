@@ -5,7 +5,7 @@
 export const APP_CACHE_VERSION =
   typeof process !== "undefined" && process.env.NEXT_PUBLIC_APP_VERSION
     ? process.env.NEXT_PUBLIC_APP_VERSION
-    : "2.9.0";
+    : "2.10.0";
 
 const STORAGE_KEY = "app_cache_version";
 
