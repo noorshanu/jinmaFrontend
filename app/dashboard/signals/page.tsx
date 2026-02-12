@@ -28,7 +28,7 @@ function formatSignalTimeUtc(signal: { timeSlot: string; customTime?: string | n
 
 export default function SignalsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"daily" | "referral" | "welcome" | "history">("daily");
+  const [activeTab, setActiveTab] = useState<"daily" | "welcome" | "history">("daily");
   const [loading, setLoading] = useState(true);
   const [signals, setSignals] = useState<Signal[]>([]);
   const [limits, setLimits] = useState<SignalLimits | null>(null);
@@ -147,9 +147,8 @@ export default function SignalsPage() {
     return date.toLocaleString("en-US", { timeZone: "UTC", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) + " UTC";
   };
 
-  // Filter signals by type
+  // Filter signals by type (REFERRAL hidden – feature disabled)
   const dailySignals = signals.filter((s) => s.type === "DAILY");
-  const referralSignals = signals.filter((s) => s.type === "REFERRAL");
   const welcomeSignals = signals.filter((s) => s.type === "WELCOME");
 
   // Filter history
@@ -265,7 +264,7 @@ export default function SignalsPage() {
                     Trading Signals
                   </span>
                 </h1>
-                <p className="text-zinc-400">Manage your daily and referral signals</p>
+                <p className="text-zinc-400">Manage your signals</p>
               </div>
               <button
                 onClick={fetchSignals}
@@ -365,31 +364,21 @@ export default function SignalsPage() {
             </motion.div>
           )}
 
-          {/* Usage Limits */}
+          {/* Usage Limits (referral signal blocks hidden – feature disabled) */}
           {limits && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-6 grid grid-cols-2 md:grid-cols-3 gap-4"
+              className="mb-6"
             >
-              <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4">
+              <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4 max-w-xs">
                 <p className="text-zinc-400 text-sm">CORE signals used today</p>
                 <p className="text-2xl font-bold text-white">{limits.dailySignalsUsed}</p>
-              </div>
-              <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4">
-                <p className="text-zinc-400 text-sm">Referral used</p>
-                <p className="text-2xl font-bold text-white">
-                  {limits.referralSignalsUsed}/{limits.maxReferralSignals}
-                </p>
-              </div>
-              <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4">
-                <p className="text-zinc-400 text-sm">Referral remaining</p>
-                <p className="text-2xl font-bold text-cyan-400">{limits.referralSignalsRemaining}</p>
               </div>
             </motion.div>
           )}
 
-          {/* Tabs */}
+          {/* Tabs (referral tab hidden – feature disabled) */}
           <div className="flex gap-2 mb-6 bg-white/5 rounded-xl p-1 max-w-lg">
             <button
               onClick={() => setActiveTab("daily")}
@@ -400,16 +389,6 @@ export default function SignalsPage() {
               }`}
             >
               CORE SIGNALS ({dailySignals.length})
-            </button>
-            <button
-              onClick={() => setActiveTab("referral")}
-              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${
-                activeTab === "referral"
-                  ? "bg-cyan-500/20 text-cyan-400 shadow-lg shadow-cyan-500/20"
-                  : "text-zinc-400 hover:text-white"
-              }`}
-            >
-              Referral ({referralSignals.length})
             </button>
             <button
               onClick={() => setActiveTab("welcome")}
@@ -506,82 +485,7 @@ export default function SignalsPage() {
                     <span>7:00 PM UTC</span>
                     <span>2 signals (direct confirmation)</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span>3:00 PM UTC</span>
-                    <span>Referral signals (if available)</span>
-                  </div>
                 </div>
-              </motion.div>
-            </div>
-          )}
-
-          {/* Referral Signals Tab */}
-          {activeTab === "referral" && (
-            <div className="space-y-6">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl"
-              >
-                <h2 className="text-xl font-semibold text-white mb-4">Referral Signals</h2>
-                {referralSignals.length === 0 ? (
-                  <p className="text-zinc-400 text-center py-8">No referral signals available right now</p>
-                ) : (
-                  <div className="space-y-3">
-                    {referralSignals.map((signal) => (
-                      <div
-                        key={signal.id}
-                        className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10"
-                      >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <span className="text-2xl">🎁</span>
-                            <div>
-                              <p className="text-white font-medium">{signal.title}</p>
-                              <p className="text-zinc-400 text-sm">
-                                {formatSignalTimeUtc(signal)} • {signal.commitPercent}% of balance
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className="text-xs text-yellow-400 bg-yellow-500/20 px-2 py-1 rounded flex items-center gap-1">
-                              <LuClock className="w-3 h-3" />
-                              {formatTimeRemaining(signal.timeRemaining)} remaining
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => !isSignalOngoing(signal) && openConfirmModal(signal)}
-                          disabled={!canTrade || isSignalOngoing(signal)}
-                          className="btn-primary rounded-lg px-4 py-2 text-sm font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed flex items-center gap-2"
-                          title={isSignalOngoing(signal) ? "Trade in progress" : !canTrade ? restriction?.message : undefined}
-                        >
-                          {isSignalOngoing(signal) ? (
-                            "Ongoing"
-                          ) : (
-                            <>
-                              Trade Now
-                              <LuArrowRight className="w-4 h-4" />
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-
-              {/* Referral Info */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="bg-cyan-500/10 border border-cyan-500/20 rounded-2xl p-6"
-              >
-                <h3 className="text-lg font-semibold text-cyan-300 mb-3">💎 Referral Signals</h3>
-                <p className="text-sm text-cyan-400/80">
-                  Referral signals are sent by admin to selected users. You can use each signal once. No grant or allowance required.
-                </p>
               </motion.div>
             </div>
           )}
