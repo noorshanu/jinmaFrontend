@@ -336,11 +336,12 @@ function TradeContent() {
     return () => { cancelled = true; };
   }, [phase, usageId]); // intentionally omit pollForResult to avoid restarting loop
 
+  const minMovementBalanceToTrade = wallet?.minMovementBalanceToTrade ?? 250;
   const isTradingActive = userProfile?.isTradingActive ?? false;
-  const hasMinBalance = movementBalance >= 250;
+  const hasMinBalance = movementBalance >= minMovementBalanceToTrade;
   const canTrade = hasMinBalance && isTradingActive;
   const restriction = !hasMinBalance
-    ? { type: "balance" as const, title: "Insufficient Balance", message: "Movement balance below $250. Add balance to trade." }
+    ? { type: "balance" as const, title: "Insufficient Balance", message: `Movement balance below $${minMovementBalanceToTrade}. Add balance to trade.` }
     : !isTradingActive
       ? { type: "inactive" as const, title: "Trading account not activated", message: "Please deposit and contact admin to activate your trading account to unlock all benefits." }
       : null;
