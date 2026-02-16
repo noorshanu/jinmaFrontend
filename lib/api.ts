@@ -123,6 +123,8 @@ export interface WalletResponse {
     };
     /** When true, Movement → Main transfer is capped so at least minBalanceForTraders remains in movement */
     isTradingActive?: boolean;
+        /** Minimum movement balance required to trade (below this, user sees add-balance message on signals) */
+        minMovementBalanceToTrade?: number;
   };
 }
 

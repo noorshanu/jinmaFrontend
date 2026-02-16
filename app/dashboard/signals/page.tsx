@@ -159,10 +159,11 @@ export default function SignalsPage() {
   const isSignalOngoing = (signal: Signal) =>
     pendingHistory.some((h) => h.signal?.id === signal.id);
 
-  // Trading restrictions
+  // Trading restrictions (min balance from admin setting, fallback 250)
+  const minMovementBalanceToTrade = wallet?.minMovementBalanceToTrade ?? 250;
   const movementBalance = wallet?.movementBalance ?? 0;
   const isTradingActive = userProfile?.isTradingActive ?? false;
-  const hasMinBalance = movementBalance >= 250;
+  const hasMinBalance = movementBalance >= minMovementBalanceToTrade;
   const canTrade = hasMinBalance && isTradingActive;
   
   // Restriction messages
@@ -170,7 +171,7 @@ export default function SignalsPage() {
     if (!hasMinBalance) {
       return {
         type: "balance" as const,
-        message: "Your Movement Wallet balance is below $250. Please add balance to start trading.",
+        message: `Your Movement Wallet balance is below $${minMovementBalanceToTrade}. Please add balance to start trading.`,
       };
     }
     if (!isTradingActive) {
